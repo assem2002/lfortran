@@ -106,20 +106,17 @@ namespace LCompilers {
             src = builder.CreateLoad(llvm::Type::getInt8Ty(context)->getPointerTo(),
                 builder.CreateGEP(string_descriptor, src, idx));
             
-
             idx[1] = llvm::ConstantInt::get(context, llvm::APInt(32, 1));
-            string_size = builder.CreateLoad(llvm::Type::getInt64Ty(context),
-                builder.CreateGEP(string_descriptor,
-                    dest, idx));
+            string_size = builder.CreateGEP(string_descriptor, dest, idx);
                     
             idx[1] = llvm::ConstantInt::get(context, llvm::APInt(32, 2));
-            string_capacity = builder.CreateLoad(llvm::Type::getInt64Ty(context), 
-                builder.CreateGEP(string_descriptor,
-                    dest, idx));
+            string_capacity =  builder.CreateGEP(string_descriptor, dest, idx);
         } else {
             char_pointer = dest;
-            string_size = llvm::ConstantInt::get(llvm::Type::getInt64Ty(context), -1);
-            string_capacity = llvm::ConstantInt::get(llvm::Type::getInt64Ty(context), -1);
+            llvm::Value* negative_one_constant = builder.CreateAlloca(llvm::Type::getInt64Ty(context), nullptr, "negative_one_constant");
+            builder.CreateStore(llvm::ConstantInt::get(context, llvm::APInt(64, -1 , true)), negative_one_constant);
+            string_size = negative_one_constant;
+            string_capacity = negative_one_constant;
         }
         llvm::Function *fn = module.getFunction(runtime_func_name);
         if (!fn) {
@@ -129,8 +126,8 @@ namespace LCompilers {
                         llvm::Type::getInt8Ty(context)->getPointerTo()->getPointerTo(), 
                         llvm::Type::getInt8Ty(context)->getPointerTo(),
                         llvm::Type::getInt8Ty(context),
-                        llvm::Type::getInt64Ty(context),
-                        llvm::Type::getInt64Ty(context)
+                        llvm::Type::getInt64Ty(context)->getPointerTo(),
+                        llvm::Type::getInt64Ty(context)->getPointerTo()
                     }, false);
             fn = llvm::Function::Create(function_type,
                     llvm::Function::ExternalLinkage, runtime_func_name, module);
