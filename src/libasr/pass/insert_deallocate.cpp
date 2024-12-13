@@ -28,11 +28,15 @@ class InsertDeallocate: public ASR::CallReplacerOnExpressionsVisitor<InsertDeall
         }
 
         inline bool is_deallocatable(ASR::symbol_t* s){
-            if( ASR::is_a<ASR::Variable_t>(*s) && 
-                ASR::is_a<ASR::Allocatable_t>(*ASRUtils::symbol_type(s)) && 
-                (ASR::is_a<ASR::String_t>(*ASRUtils::type_get_past_allocatable(ASRUtils::symbol_type(s))) ||
-                ASRUtils::is_array(ASRUtils::symbol_type(s))) &&
-                ASRUtils::symbol_intent(s) == ASRUtils::intent_local){
+            if(!ASR::is_a<ASR::Variable_t>(*s)) {return false;}
+
+            bool is_allocatble_array = ASR::is_a<ASR::Allocatable_t>(*ASRUtils::symbol_type(s)) && 
+                                       ASRUtils::is_array(ASRUtils::symbol_type(s)); 
+            bool is_string = ASR::is_a<ASR::String_t>(*ASRUtils::type_get_past_allocatable(
+                             ASRUtils::symbol_type(s)));
+            bool is_intent_local = ASRUtils::symbol_intent(s) == ASRUtils::intent_local;  
+
+            if( (is_allocatble_array || is_string) && is_intent_local ){
                 return true;
             }
             return false;
@@ -64,16 +68,15 @@ class InsertDeallocate: public ASR::CallReplacerOnExpressionsVisitor<InsertDeall
 
             Vec<ASR::stmt_t*> new_body; // Final body after inserting finalization nodes.
             new_body.reserve(al, 1);
-            bool return_or_exit_encounterd = false; 
+            bool return_encounterd = false; 
 
             for(size_t i = 0; i < n_body; i++){
-                if( ( ASR::is_a<ASR::Return_t>(*m_body[i]) || 
-                      ASR::is_a<ASR::Exit_t>(*m_body[i]) ) &&
-                    !return_or_exit_encounterd){
+                if( ( ASR::is_a<ASR::Return_t>(*m_body[i]) ) &&
+                    !return_encounterd){
                     new_body.push_back(al, implicitDeallocate_stmt_stack.top());
-                    return_or_exit_encounterd = true; // No need to insert finaliztion node once we encounter a return or exit stmt in signle body (dead code).
+                    return_encounterd = true; // No need to insert finaliztion node once we encounter a return or exit stmt in signle body (dead code).
                 }
-                if(!return_or_exit_encounterd) { visit_stmt(*(m_body[i])); }
+                if(!return_encounterd) { visit_stmt(*(m_body[i])); }
                 new_body.push_back(al, m_body[i]);
             }
             m_body = new_body.p;
@@ -90,8 +93,7 @@ class InsertDeallocate: public ASR::CallReplacerOnExpressionsVisitor<InsertDeall
                 return;
             }
             for(size_t i = 0; i < x.n_body; i++){
-                if( ASR::is_a<ASR::Return_t>(*x.m_body[i]) || 
-                    ASR::is_a<ASR::Exit_t>(*x.m_body[i])){
+                if( ASR::is_a<ASR::Return_t>(*x.m_body[i])){
                     return; // already handled, and no need to insert at end.
                 }
             }

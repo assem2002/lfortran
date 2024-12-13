@@ -1254,16 +1254,26 @@ public:
             int dims = ASRUtils::extract_n_dims_from_ttype(cur_type);
             if (dims == 0) {
                 if (ASRUtils::is_character(*cur_type)) {
-                    llvm::Value* char_ptr, *size, *capacity;
-                    char_ptr = llvm_utils->create_gep2(string_descriptor, tmp, 0);
-                    size = llvm_utils->create_gep2(string_descriptor, tmp, 1);
-                    capacity = llvm_utils->create_gep2(string_descriptor, tmp, 2);
+                    if(ASRUtils::is_descriptorString(cur_type)){
+                        llvm::Value* char_ptr, *size, *capacity;
+                        char_ptr = llvm_utils->create_gep2(string_descriptor, tmp, 0);
+                        size = llvm_utils->create_gep2(string_descriptor, tmp, 1);
+                        capacity = llvm_utils->create_gep2(string_descriptor, tmp, 2);
 
-                    builder->CreateCall(_Deallocate(),{llvm_utils->CreateLoad2(character_type, char_ptr)});
-                    builder->CreateStore(llvm::ConstantPointerNull::getNullValue(llvm::Type::getInt8Ty(context)->getPointerTo()), char_ptr);
-                    builder->CreateStore(llvm::ConstantInt::get(llvm::Type::getInt64Ty(context),0), size);
-                    builder->CreateStore(llvm::ConstantInt::get(llvm::Type::getInt64Ty(context),0), capacity);
-                    continue;
+                        builder->CreateCall(_Deallocate(),{llvm_utils->CreateLoad2(character_type, char_ptr)});
+                        builder->CreateStore(llvm::ConstantPointerNull::getNullValue(llvm::Type::getInt8Ty(context)->getPointerTo()), char_ptr);
+                        builder->CreateStore(llvm::ConstantInt::get(llvm::Type::getInt64Ty(context),0), size);
+                        builder->CreateStore(llvm::ConstantInt::get(llvm::Type::getInt64Ty(context),0), capacity);
+                    } else { //PointerString
+                        builder->CreateCall(_Deallocate(), {tmp});
+                        ASR::Variable_t *v = ASR::down_cast<ASR::Variable_t>(
+                        symbol_get_past_external(curr_obj));
+                        int64_t ptr_loads_copy = ptr_loads;
+                        ptr_loads = 0;
+                        fetch_var(v);
+                        ptr_loads = ptr_loads_copy;
+                        builder->CreateStore(llvm::ConstantPointerNull::getNullValue(llvm::Type::getInt8Ty(context)->getPointerTo()), tmp);
+                    }
                 } else {
                     llvm::Value* tmp_ = tmp;
                     if( LLVM::is_llvm_pointer(*cur_type) ) {
@@ -3875,9 +3885,9 @@ public:
                         llvm::Value *init_value = LLVM::lfortran_malloc(context, *module, *builder, arg_size);
                         string_init(context, *module, *builder, arg_size, init_value);
                         builder->CreateStore(init_value, target_var);
-                        if (v->m_intent == intent_local) {
-                            strings_to_be_deallocated.push_back(al, llvm_utils->CreateLoad2(v->m_type, target_var));
-                        }
+                        // if (v->m_intent == intent_local) {
+                        //     strings_to_be_deallocated.push_back(al, llvm_utils->CreateLoad2(v->m_type, target_var));
+                        // }
                     } else if (strlen == -2) {
                         // Allocatable string. Initialize to `nullptr` (unallocated)
                         llvm::Value *init_value = llvm::Constant::getNullValue(type);
