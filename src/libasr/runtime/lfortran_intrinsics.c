@@ -954,10 +954,51 @@ bool is_format_match(char format_value, int32_t current_arg_type_int){
     }
 }
 
-LFORTRAN_API char* _lcompilers_string_format_fortran(int count, const char* format, ...)
+LFORTRAN_API char* _lcompilers_string_format_fortran(int count, const char* format, const char* serialization_info,
+    int n_sizes, ...)
 {
     va_list args;
-    va_start(args, format);
+    va_start(args, n_sizes);
+    int64_t sizes[n_sizes];
+    fprintf(stdout,"%s\n", serialization_info); // Remove : for debugging purposes
+    for (int i = 0; i < n_sizes; i++) {
+        sizes[i] = va_arg(args, int64_t);
+        fprintf(stdout,"%lld\n", sizes[i]); // Remove : for debugging purposes
+    }
+    fflush(stdout);
+
+    int32_t n = va_arg(args, int32_t);
+    va_arg(args, int64_t);
+    void* p = va_arg(args, void*);
+    void* srtc = p;
+    printf("%d\n", *(int*)p);
+    p+=4;
+    printf("%d\n", *(int*)p);
+
+    p+=4;
+
+    printf("%d\n", *(int*)p);
+    p+=4;
+    printf("%d\n", *(int*)p);
+    p+=4;
+    printf("%d\n", *(int*)p);
+    p+=4;
+
+    printf("%d\n", *(int*)p);
+    p+=4;
+    printf("%d\n", *(int*)p);
+
+    p+=4;
+
+    printf("%d\n", *(int*)p);
+    p+=4;
+    printf("%d\n", *(int*)p);
+    p+=4;
+    printf("%d\n", *(int*)p);
+    p+=4;
+
+
+
     bool default_formatting = (format == NULL);
     char* default_spacing = "    ";
     int64_t format_values_count = 0,item_start_idx=0;
@@ -2109,6 +2150,8 @@ int str_compare(char **s1, char **s2)
 {
     int s1_len = strlen_without_trailing_space(*s1);
     int s2_len = strlen_without_trailing_space(*s2);
+    printf("first size%d\n", s1_len);
+    printf("second size%d\n", s2_len);
     int lim = MIN(s1_len, s2_len);
     int res = 0;
     int i ;

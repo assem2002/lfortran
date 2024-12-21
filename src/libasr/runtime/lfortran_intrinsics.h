@@ -271,7 +271,7 @@ LFORTRAN_API char *_lfortran_get_env_variable(char *name);
 LFORTRAN_API char *_lfortran_get_environment_variable(char *name);
 LFORTRAN_API int _lfortran_exec_command(char *cmd);
 
-LFORTRAN_API char* _lcompilers_string_format_fortran(int count, const char* format, ...);
+LFORTRAN_API char* _lcompilers_string_format_fortran(int count, const char* format,const char* serialization_info, int n_size, ...);
 
 #ifdef __cplusplus
 }

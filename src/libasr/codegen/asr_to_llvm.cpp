@@ -8315,7 +8315,142 @@ public:
         }
         tmp = builder->CreateCall(fn, printf_args);
     }
+    
+    void serialize_structType_symbols(ASR::StructType_t* x, std::string &res /*Holds return for efficiency*/){
+        ASR::Struct_t* struct_symbol = ASR::down_cast<ASR::Struct_t>(x->m_derived_type); 
+        for(size_t i=0; i < struct_symbol->n_members; i++){
+            ASR::symbol_t* sym = struct_symbol->m_symtab->get_symbol(struct_symbol->m_members[i]);
+            if(!ASR::is_a<ASR::Variable_t>(*sym)){
+               continue; 
+            }
+            create_serialized_type(ASRUtils::symbol_type(sym), res);
+            if(i < struct_symbol->n_members-1){ // Add comma between types.
+                res += ",";
+            }
+        }
+    }
 
+    /* 
+        [ ] --> Array
+        ( ) --> Struct
+        I   --> Integer
+        R   --> Real
+        STR --> Character
+        L   --> Logical
+        C   --> Complex
+    */
+    // Creates a string representing the types the arguments to be printed. 
+    void create_serialized_type(ASR::ttype_t* type, std::string &res /*Holds return for efficiency*/){ 
+        type = ASRUtils::type_get_past_allocatable(
+                ASRUtils::type_get_past_pointer(type));
+        if (ASR::is_a<ASR::Integer_t>(*type)) {
+            res += "I";
+            res += std::to_string(ASRUtils::extract_kind_from_ttype_t(type) * 8);
+        } else if (ASR::is_a<ASR::Real_t>(*type)) {
+            res += "R";
+            res += std::to_string(ASRUtils::extract_kind_from_ttype_t(type) * 8);
+        } else if (ASR::is_a<ASR::String_t>(*type)) {
+            res += "STR";
+        } else if (ASR::is_a<ASR::Complex_t>(*type)){
+            res += "C";
+            res += std::to_string(ASRUtils::extract_kind_from_ttype_t(type) * 8);
+        } else if (ASR::is_a<ASR::Array_t>(*type)) {
+            res += "[";
+            ASR::Array_t* arr = ASR::down_cast<ASR::Array_t>(type);
+            create_serialized_type(arr->m_type, res);
+            res += "]";
+        } else if (ASR::is_a<ASR::StructType_t>(*type)) {
+            res += "(";
+            ASR::StructType_t* struct_variable = ASR::down_cast<ASR::StructType_t>(type);
+            serialize_structType_symbols(struct_variable, res);
+            res += ")";
+        } else if (ASR::is_a<ASR::Logical_t>(*type)) {
+            res += "L";
+        } else if(ASR::is_a<ASR::CPtr_t>(*type)){
+            res += "CPtr";
+        } else {
+            throw CodeGenError("Printing support is not available for `" +
+                ASRUtils::type_to_str(type) + "` type.");
+        }
+    }
+    llvm::Value* serialize_args_types(ASR::expr_t** args, size_t n_args){
+        std::string serialization_res = "";
+        for (size_t i=0; i<n_args; i++) {
+            create_serialized_type(ASRUtils::expr_type(args[i]), serialization_res);
+            if(i != n_args-1){ // Add comma between types.
+                serialization_res += ",";
+            }
+        }
+        return builder->CreateGlobalStringPtr(serialization_res, "serialization_info");
+    }
+
+    ASR::expr_t* create_array_compile_time_size_expr(ASR::ttype_t* array_type){
+        LCOMPILERS_ASSERT(ASR::is_a<ASR::Array_t>(*
+            ASRUtils::type_get_past_allocatable_pointer(array_type)));
+        int64_t array_size = ASRUtils::get_fixed_size_of_array(array_type);
+        if(array_size != -1){
+             return ASRUtils::EXPR(
+                    ASR::make_IntegerConstant_t(al,array_type->base.loc, array_size,
+                    ASRUtils::TYPE(ASR::make_Integer_t(al, array_type->base.loc, 8))));
+        }
+        return nullptr;
+    }
+
+    ASR::expr_t* create_array_size(ASR::expr_t* expr){
+        ASR::ttype_t* type = ASRUtils::type_get_past_allocatable_pointer(ASRUtils::expr_type(expr));
+        LCOMPILERS_ASSERT(ASR::is_a<ASR::Array_t>(*type));
+        return  ASRUtils::EXPR(
+                ASR::make_ArraySize_t(al, expr->base.loc, expr,
+                nullptr, ASRUtils::TYPE(ASR::make_Integer_t(al, expr->base.loc, 8)),
+                create_array_compile_time_size_expr(type)));   
+    }
+
+    void get_compile_time_arraySize_in_structs(ASR::ttype_t* x, LCompilers::Location& loc, Vec<llvm::Value*> &args_sizes){ 
+        LCOMPILERS_ASSERT(ASR::is_a<ASR::StructType_t>(*x));
+        ASR::Struct_t* struct_symbol = ASR::down_cast<ASR::Struct_t>(
+            ASR::down_cast<ASR::StructType_t>(x)->m_derived_type); 
+        for(size_t i=0; i < struct_symbol->n_members; i++){
+            ASR::symbol_t* sym = struct_symbol->m_symtab->get_symbol(struct_symbol->m_members[i]);
+            if(!ASR::is_a<ASR::Variable_t>(*sym)){
+                continue; 
+            }
+            if(ASRUtils::is_array(ASRUtils::symbol_type(sym))){
+                if(!ASRUtils::is_fixed_size_array(ASRUtils::symbol_type(sym))){
+                    throw CodeGenError("Can't print type variable with dynamic array member", loc);
+                }
+                ASR::expr_t* compile_time_array_size = create_array_compile_time_size_expr(ASRUtils::symbol_type(sym));
+                visit_expr(*compile_time_array_size);
+                args_sizes.push_back(al, tmp);
+                if(ASR::is_a<ASR::StructType_t>(*ASRUtils::type_get_past_array(ASRUtils::symbol_type(sym)))){
+                    get_compile_time_arraySize_in_structs(ASRUtils::type_get_past_array(ASRUtils::symbol_type(sym))
+                        , loc, args_sizes);
+                }
+            } else if(ASR::is_a<ASR::StructType_t>(*ASRUtils::symbol_type(sym))){
+                get_compile_time_arraySize_in_structs(ASRUtils::symbol_type(sym), loc, args_sizes);
+            }
+        }
+    }
+
+    void serialize_args_array_sizes(ASR::expr_t** args, size_t n_args, Vec<llvm::Value*> &args_sizes){
+        for (size_t i=0; i<n_args; i++) { // Check for arrays and structTypes. 
+            if(ASRUtils::is_array(ASRUtils::expr_type(args[i]))){
+                ASR::expr_t* compile_time_array_size = create_array_size(args[i]);
+                visit_expr(*compile_time_array_size);
+                args_sizes.push_back(al, tmp);
+
+                // Handle array of type StructType.
+                ASR::ttype_t* type_of_array = ASRUtils::type_get_past_array(
+                    ASRUtils::type_get_past_allocatable_pointer(ASRUtils::expr_type(args[i])));
+                if (ASR::is_a<ASR::StructType_t>(*type_of_array)){
+                    get_compile_time_arraySize_in_structs(type_of_array, args[i]->base.loc, args_sizes);
+                }
+                
+            } else if (ASR::is_a<ASR::StructType_t>(*ASRUtils::expr_type(args[i]))){
+                get_compile_time_arraySize_in_structs(
+                    ASRUtils::expr_type(args[i]), args[i]->base.loc, args_sizes);
+            }
+        }
+    }
     // Enumeration for the types to be used by the runtime stringformat intrinsic.
     // (1)i64, (2)i32, (3)i16, (4)i8, (5)f64, (6)f32, (7)character, (8)logical,
     // (9)array[i64], (10)array[i32], (11)array[i16], (12)array[i8],
@@ -8575,8 +8710,8 @@ public:
                 args.push_back(tmp);
             }
         } else {
-            throw CodeGenError("Printing support is not available for `" +
-                ASRUtils::type_to_str(t) + "` type.", loc);
+            // throw CodeGenError("Printing support is not available for `" +
+            //     ASRUtils::type_to_str(t) + "` type.", loc);
         }
 
         if(is_array){
@@ -10387,6 +10522,7 @@ public:
         // if (fmt_value) ...
         if (x.m_kind == ASR::string_format_kindType::FormatFortran) {
             std::vector<llvm::Value *> args;
+            // Push fmt string.
             if(x.m_fmt == nullptr){ // default formatting
                 llvm::Type* int8Type = builder->getInt8Ty();
                 llvm::PointerType* charPtrType = int8Type->getPointerTo();
@@ -10396,15 +10532,27 @@ public:
                 visit_expr(*x.m_fmt);
                 args.push_back(tmp);
             }
-
+            // Push serialization of types;
+            llvm::Value* serialization_info = serialize_args_types(x.m_args, x.n_args);
+            args.push_back(serialization_info);
+            //Push serialization of sizes and n_size
+            Vec<llvm::Value*> serialized_sizes;
+            serialized_sizes.reserve(al,0);
+            serialize_args_array_sizes(x.m_args, x.n_args, serialized_sizes);
+            args.push_back(llvm::ConstantInt::get(
+                llvm::Type::getInt32Ty(context), serialized_sizes.size()));
+            for(llvm::Value* size_ : serialized_sizes){
+                args.push_back(size_);
+            }
             for (size_t i=0; i<x.n_args; i++) {
                 std::vector<std::string> fmt;
                 //  Use the function to compute the args, but ignore the format
                 compute_fmt_specifier_and_arg(fmt, args, x.m_args[i], x.base.base.loc,true);
             }
             llvm::Value *args_cnt = llvm::ConstantInt::get(llvm::Type::getInt32Ty(context),
-                args.size() - 1);
+                args.size() - 3 - serialized_sizes.size());
             args.insert(args.begin(), args_cnt);
+            // Change the signature to (fmt, serialized_info, n_sizes, serialized_sizes+args...)
             tmp = string_format_fortran(context, *module, *builder, args);
         } else {
             throw CodeGenError("Only FormatFortran string formatting implemented so far.");
