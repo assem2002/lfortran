@@ -4435,6 +4435,16 @@ class SymbolDuplicator {
                 external_symbol->m_access));
     }
 
+    ASR::symbol_t* duplicate_ClassProcedure(ASR::ClassProcedure_t* class_procedure, 
+        SymbolTable* destination_symtab){
+        return ASR::down_cast<ASR::symbol_t>(ASR::make_ClassProcedure_t(
+            al, class_procedure->base.base.loc, destination_symtab,
+            class_procedure->m_name, class_procedure->m_self_argument, 
+            class_procedure->m_proc_name, class_procedure->m_proc, 
+            class_procedure->m_abi, class_procedure->m_is_deferred,
+            class_procedure->m_is_nopass));
+    }
+
     ASR::symbol_t* duplicate_AssociateBlock(ASR::AssociateBlock_t* associate_block,
         SymbolTable* destination_symtab) {
         SymbolTable* associate_block_symtab = al.make_new<SymbolTable>(destination_symtab);
