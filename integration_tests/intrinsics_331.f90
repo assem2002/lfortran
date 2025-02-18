@@ -14,6 +14,7 @@ program intrinsics_331
     call shift_elemements(2, arr1, arr2)
 
     print *, arr2
+    print *, "--------" 
     if (any(arr2 /= [2., 1.])) error stop
 
     ! TODO: this causes segmentation fault currently

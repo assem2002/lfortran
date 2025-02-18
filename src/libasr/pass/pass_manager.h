@@ -78,7 +78,9 @@ namespace LCompilers {
         std::vector<std::string> _passes;
         std::vector<std::string> _with_optimization_passes;
         std::vector<std::string> _user_defined_passes;
-        std::vector<std::string> _skip_passes, _c_skip_passes;
+        std::vector<std::string> _skip_passes, 
+                _c_skip_passes, 
+                _llvm_skip_passes /*Contains passes that get skipped with llvm backend*/;
         std::map<std::string, pass_function> _passes_db = {
             {"do_loops", &pass_replace_do_loops},
             {"while_else", &pass_while_else},
@@ -166,6 +168,7 @@ namespace LCompilers {
                 if (c_skip_pass && std::find(_c_skip_passes.begin(),
                         _c_skip_passes.end(), passes[i]) != _c_skip_passes.end())
                     continue;
+                if(std::find(_llvm_skip_passes.begin(), _llvm_skip_passes.end(), passes[i]) != _llvm_skip_passes.end()) continue;
                 if (pass_options.verbose) {
                     std::cerr << "ASR Pass starts: '" << passes[i] << "'\n";
                 }
@@ -293,6 +296,11 @@ namespace LCompilers {
                 "select_case",
                 "inline_function_calls"
             };
+            // These passes' job is handled in LLVM backend;
+            _llvm_skip_passes = {
+                "print_arr",
+                "print_struct_type"
+            };
             _user_defined_passes.clear();
         }
 
@@ -333,6 +341,8 @@ namespace LCompilers {
                 // earlier
                 // Note: this is not enough for rtlib, we also need to include
                 // it
+                if(std::find(_llvm_skip_passes.begin(), _llvm_skip_passes.end(), passes[i]) != _llvm_skip_passes.end()) continue;
+
                 if (pass_options.verbose) {
                     std::cerr << "ASR Pass starts: '" << passes[i] << "'\n";
                 }
