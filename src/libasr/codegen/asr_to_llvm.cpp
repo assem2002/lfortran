@@ -65,23 +65,6 @@ using ASRUtils::determine_module_dependencies;
 using ASRUtils::is_arg_dummy;
 using ASRUtils::is_argument_of_type_CPtr;
 
-void string_init(llvm::LLVMContext &context, llvm::Module &module,
-        llvm::IRBuilder<> &builder, llvm::Value* arg_size, llvm::Value* arg_string) {
-    std::string func_name = "_lfortran_string_init";
-    llvm::Function *fn = module.getFunction(func_name);
-    if (!fn) {
-        llvm::FunctionType *function_type = llvm::FunctionType::get(
-                llvm::Type::getVoidTy(context), {
-                    llvm::Type::getInt32Ty(context),
-                    llvm::Type::getInt8Ty(context)->getPointerTo()
-                }, false);
-        fn = llvm::Function::Create(function_type,
-                llvm::Function::ExternalLinkage, func_name, module);
-    }
-    std::vector<llvm::Value*> args = {arg_size, arg_string};
-    builder.CreateCall(fn, args);
-}
-
 class ASRToLLVMVisitor : public ASR::BaseVisitor<ASRToLLVMVisitor>
 {
 private:
@@ -129,6 +112,25 @@ private:
         std::cout << os.str() << endline;
     }
 
+    void string_init(llvm::LLVMContext &context, llvm::Module &module,
+        llvm::IRBuilder<> &builder, llvm::Value* arg_size, llvm::Value* arg_string) {
+    std::string func_name = "_lfortran_string_init";
+    llvm::Function *fn = module.getFunction(func_name);
+    if (!fn) {
+        llvm::FunctionType *function_type = llvm::FunctionType::get(
+                llvm::Type::getVoidTy(context), {
+                    llvm::Type::getInt64Ty(context),
+                    llvm::Type::getInt8Ty(context)->getPointerTo()
+                }, false);
+        fn = llvm::Function::Create(function_type,
+                llvm::Function::ExternalLinkage, func_name, module);
+    }
+    std::vector<llvm::Value*> args = {llvm_utils->convert_kind(arg_size,
+                                            llvm::Type::getInt64Ty(context)),
+                                    arg_string};
+    builder.CreateCall(fn, args);
+}
+
 public:
     diag::Diagnostics &diag;
     llvm::LLVMContext &context;
@@ -163,7 +165,7 @@ public:
     std::map<std::string, uint64_t> llvm_symtab_fn_names;
     std::map<uint64_t, llvm::Value*> llvm_symtab_fn_arg;
     std::map<uint64_t, llvm::BasicBlock*> llvm_goto_targets;
-
+    std::set<uint32_t> global_string_allocated;
     const ASR::Function_t *parent_function = nullptr;
 
     std::vector<llvm::BasicBlock*> loop_head; /* For saving the head of a loop,
@@ -1009,7 +1011,7 @@ public:
             size_t n_dims = ASRUtils::extract_n_dims_from_ttype(curr_arg_m_a_type);
             curr_arg_m_a_type = ASRUtils::type_get_past_array(curr_arg_m_a_type);
             if( n_dims == 0 ) {
-                llvm::Function *fn = _Allocate(realloc);
+                llvm::Function *fn = _Allocate();
                 if (ASRUtils::is_character(*curr_arg_m_a_type)) {
                     LCOMPILERS_ASSERT_MSG(ASRUtils::is_descriptorString(expr_type(tmp_expr)),
                     "string isn't allocatable");
@@ -1020,8 +1022,8 @@ public:
                     LCOMPILERS_ASSERT(curr_arg.m_len_expr != nullptr);
                     visit_expr(*curr_arg.m_len_expr);
                     ptr_loads = ptr_loads_copy;
-                    llvm::Value* m_len = tmp;
-                    llvm::Value* const_one = llvm::ConstantInt::get(context, llvm::APInt(32, 1));
+                    llvm::Value* m_len = llvm_utils->convert_kind(tmp, llvm::Type::getInt64Ty(context));
+                    llvm::Value* const_one = llvm::ConstantInt::get(context, llvm::APInt(64, 1));
                     llvm::Value* alloc_size = builder->CreateAdd(m_len, const_one);
                     std::vector<llvm::Value*> args;
                     llvm::Value* ptr_to_init;
@@ -1199,17 +1201,14 @@ public:
         // }
     }
 
-    llvm::Function* _Allocate(bool realloc_lhs) {
-        std::string func_name = "_lfortran_alloc";
-        if( realloc_lhs ) {
-            func_name = "_lfortran_realloc";
-        }
+    llvm::Function* _Allocate() {
+        std::string func_name = "_lfortran_allocate_string";
         llvm::Function *alloc_fun = module->getFunction(func_name);
         if (!alloc_fun) {
             llvm::FunctionType *function_type = llvm::FunctionType::get(
                     llvm::Type::getVoidTy(context), {
                         character_type->getPointerTo(),
-                        llvm::Type::getInt32Ty(context),
+                        llvm::Type::getInt64Ty(context),
                         llvm::Type::getInt64Ty(context)->getPointerTo(),
                         llvm::Type::getInt64Ty(context)->getPointerTo()
                     }, false);
@@ -3596,6 +3595,13 @@ public:
                 } else {
                     fill_array_details_(ptr_member, nullptr, m_dims, n_dims, false, true, false, symbol_type, is_data_only);
                 }
+                if (ASR::is_a<ASR::StructType_t>(*ASRUtils::type_get_past_array(symbol_type))) {
+#if LLVM_VERSION_MAJOR > 16
+ptr_type[ptr_member] = llvm_utils->get_type_from_ttype_t_util(
+    symbol_type, module.get());
+#endif
+                    allocate_array_members_of_struct_arrays(ptr_member, symbol_type);
+                }
             } else if( ASR::is_a<ASR::StructType_t>(*symbol_type) ) {
                 allocate_array_members_of_struct(ptr_member, symbol_type);
             }
@@ -5383,6 +5389,19 @@ public:
                     return;
                 } else if (ASR::is_a<ASR::Var_t>(*x.m_target)) {
                     ASR::Variable_t *asr_target = EXPR2VAR(x.m_target);
+                    uint32_t h = get_hash((ASR::asr_t*)asr_target);
+                    bool already_allocated = global_string_allocated.find(h) != global_string_allocated.end();
+                    if (ASR::is_a<ASR::ExternalSymbol_t>(*ASR::down_cast<ASR::Var_t>(x.m_target)->m_v) && 
+                        asr_target->m_symbolic_value != nullptr && !already_allocated) {
+                        ASR::String_t* str_type = ASR::down_cast<ASR::String_t>(asr_target->m_type); 
+                        llvm::Value *arg_size = llvm::ConstantInt::get(
+                            context, llvm::APInt(32, str_type->m_len+1));
+                        llvm::Value *init_value = LLVM::lfortran_malloc(context, *module, *builder, arg_size);
+                        string_init(context, *module, *builder, arg_size, init_value);
+                        builder->CreateStore(init_value, target);
+                        strings_to_be_deallocated.push_back(al, llvm_utils->CreateLoad2(asr_target->m_type, target));
+                        global_string_allocated.insert(h);
+                    }
                     tmp = lfortran_str_copy(target, value,
                         ASRUtils::is_descriptorString(asr_target->m_type));
                     return;
@@ -8163,6 +8182,25 @@ public:
                 ptr_loads = ptr_copy;
                 ASR::ttype_t* type = ASRUtils::expr_type(x.m_values[i]);
                 llvm::Function *fn;
+                if (ASR::is_a<ASR::Var_t>(*x.m_values[i]) && 
+                    ASR::is_a<ASR::ExternalSymbol_t>(*ASR::down_cast<ASR::Var_t>(x.m_values[i])->m_v)) {
+                    ASR::Variable_t *asr_target = EXPR2VAR(x.m_values[i]);
+                    uint32_t h = get_hash((ASR::asr_t*)asr_target);
+                    llvm::Value *target = llvm_symtab[h];
+                    bool already_allocated = global_string_allocated.find(h) != global_string_allocated.end();
+                    if (ASR::is_a<ASR::String_t>(*asr_target->m_type) && 
+                        asr_target->m_symbolic_value != nullptr && 
+                        !already_allocated) {
+                        ASR::String_t* str_type = ASR::down_cast<ASR::String_t>(asr_target->m_type); 
+                        llvm::Value *arg_size = llvm::ConstantInt::get(
+                            context, llvm::APInt(32, str_type->m_len+1));
+                        llvm::Value *init_value = LLVM::lfortran_malloc(context, *module, *builder, arg_size);
+                        string_init(context, *module, *builder, arg_size, init_value);
+                        builder->CreateStore(init_value, target);
+                        strings_to_be_deallocated.push_back(al, llvm_utils->CreateLoad2(asr_target->m_type, target));
+                        global_string_allocated.insert(h);
+                    }
+                }
                 if (is_string) {
                     // TODO: Support multiple arguments and fmt
                     std::string runtime_func_name = "_lfortran_string_read_" +
