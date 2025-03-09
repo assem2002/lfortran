@@ -6,11 +6,7 @@
     "outfile": null,
     "outfile_hash": null,
     "stdout": "llvm-intrinsics_02-404e16e.stdout",
-<<<<<<< HEAD
-    "stdout_hash": "79bae6e8d23b3551bcd0f70c86fcd9b5f782dfbd4c7033b062fd35dc",
-=======
-    "stdout_hash": "c921df6da07fceba918902bb8b6a22431dbb7b84c639610dd49893ca",
->>>>>>> origin/main
+    "stdout_hash": "3382cf4192a9c9fd34119b511c7ffcc8299517c2f73189dc82855e2f",
     "stderr": null,
     "stderr_hash": null,
     "returncode": 0
