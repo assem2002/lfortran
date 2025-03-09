@@ -638,7 +638,7 @@ int python_wrapper(const std::string &infile, std::string array_order,
 
 [[maybe_unused]] int emit_asr(const std::string &infile,
     LCompilers::PassManager& pass_manager,
-    CompilerOptions &compiler_options, LCompilers::PassManager::backend Backend)
+    CompilerOptions &compiler_options)
 {
     std::string input = read_file(infile);
 
@@ -677,7 +677,7 @@ int python_wrapper(const std::string &infile, std::string array_order,
     compiler_options.po.always_run = true;
     compiler_options.po.run_fun = "f";
 
-    pass_manager.apply_passes(al, asr, compiler_options.po, diagnostics, Backend);
+    pass_manager.apply_passes(al, asr, compiler_options.po, diagnostics);
     if (compiler_options.po.tree) {
         std::cout << LCompilers::pickle_tree(*asr,
             compiler_options.use_colors) << std::endl;
@@ -800,8 +800,7 @@ int emit_fortran(const std::string &infile, CompilerOptions &compiler_options) {
     }
 }
 
-int dump_all_passes(const std::string &infile, CompilerOptions &compiler_options, 
-    LCompilers::PassManager::backend Backend) {
+int dump_all_passes(const std::string &infile, CompilerOptions &compiler_options) {
     std::string input = read_file(infile);
 
     LCompilers::FortranEvaluator fe(compiler_options);
@@ -821,7 +820,7 @@ int dump_all_passes(const std::string &infile, CompilerOptions &compiler_options
         LCompilers::PassManager pass_manager;
         compiler_options.po.always_run = true;
         compiler_options.po.run_fun = "f";
-        pass_manager.dump_all_passes(al, asr.result, compiler_options.po, diagnostics, lm, Backend);
+        pass_manager.dump_all_passes(al, asr.result, compiler_options.po, diagnostics, lm);
         std::cerr << diagnostics.render(lm, compiler_options);
     } else {
         LCOMPILERS_ASSERT(diagnostics.has_error())
@@ -2183,8 +2182,6 @@ int main_app(int argc, char *argv[]) {
 
     std::string rtlib_header_dir = LCompilers::LFortran::get_runtime_library_header_dir();
     Backend backend;
-    LCompilers::PassManager::backend BackendPassManagerEnum=
-                        LCompilers::PassManager::backend::llvm; // Both backend variables are the same, different enum.
 
     bool arg_S = false;
     bool arg_c = false;
@@ -2511,28 +2508,22 @@ int main_app(int argc, char *argv[]) {
         return python_wrapper(arg_pywrap_file, arg_pywrap_array_order,
             compiler_options);
     }
-    // TODO : Use only one single enum class.
+
     if (arg_backend == "llvm") {
         backend = Backend::llvm;
-        BackendPassManagerEnum = LCompilers::PassManager::backend::llvm;
-    } else if (arg_backend == "c") {
+        lfortran_pass_manager.passes_to_skip_with_llvm.push_back({"print_arr","print_struct_type"});
+    } else if (opts.arg_backend == "c") {
         backend = Backend::c;
-        BackendPassManagerEnum = LCompilers::PassManager::backend::c;
-    } else if (arg_backend == "cpp") {
+    } else if (opts.arg_backend == "cpp") {
         backend = Backend::cpp;
-        BackendPassManagerEnum = LCompilers::PassManager::backend::cpp;
-    } else if (arg_backend == "x86") {
+    } else if (opts.arg_backend == "x86") {
         backend = Backend::x86;
-        BackendPassManagerEnum = LCompilers::PassManager::backend::x86;
-    } else if (arg_backend == "wasm") {
+    } else if (opts.arg_backend == "wasm") {
         backend = Backend::wasm;
-        BackendPassManagerEnum = LCompilers::PassManager::backend::wasm;
-    } else if (arg_backend == "fortran") {
+    } else if (opts.arg_backend == "fortran") {
         backend = Backend::fortran;
-        BackendPassManagerEnum = LCompilers::PassManager::backend::fortran;
-    } else if (arg_backend == "mlir") {
+    } else if (opts.arg_backend == "mlir") {
         backend = Backend::mlir;
-        BackendPassManagerEnum = LCompilers::PassManager::backend::mlir;
     } else {
         std::cerr << "The backend must be one of: llvm, cpp, x86, wasm, fortran, mlir." << std::endl;
         return 1;
@@ -2619,6 +2610,7 @@ int main_app(int argc, char *argv[]) {
 
     if (compiler_options.po.dump_fortran || compiler_options.po.dump_all_passes) {
         dump_all_passes(arg_file, compiler_options, BackendPassManagerEnum);
+        dump_all_passes(opts.arg_file, compiler_options);
     }
 
     if (arg_E) {
@@ -2650,6 +2642,9 @@ int main_app(int argc, char *argv[]) {
     if (show_asr) {
         return emit_asr(arg_file, lfortran_pass_manager,
                 compiler_options, BackendPassManagerEnum);
+    if (opts.show_asr) {
+        return emit_asr(opts.arg_file, lfortran_pass_manager,
+                compiler_options);
     }
     if (show_document_symbols) {
         return get_symbols(arg_file, compiler_options);

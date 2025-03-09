@@ -10729,7 +10729,7 @@ Result<std::unique_ptr<LLVMModule>> asr_to_llvm(ASR::TranslationUnit_t &asr,
     co.po.always_run = false;
     co.po.skip_optimization_func_instantiation = skip_optimization_func_instantiation;
     pass_manager.rtlib = co.rtlib;
-    pass_manager.apply_passes(al, &asr, co.po, diagnostics, PassManager::backend::llvm);
+    pass_manager.apply_passes(al, &asr, co.po, diagnostics);
 
     // Uncomment for debugging the ASR after the transformation
     // std::cout << LCompilers::pickle(asr, true, false, false) << std::endl;
