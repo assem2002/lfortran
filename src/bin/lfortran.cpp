@@ -2398,9 +2398,10 @@ int main_app(int argc, char *argv[]) {
     if ( compiler_options.semantics_only ) {
         return run_parser_and_semantics(opts.arg_file, compiler_options);
     }
-    if (show_asr) {
-        return emit_asr(arg_file, lfortran_pass_manager,
-                compiler_options, BackendPassManagerEnum);
+    if (opts.show_asr) {
+        return emit_asr(opts.arg_file, lfortran_pass_manager,
+                compiler_options);
+    }
     if (opts.show_asr) {
         return emit_asr(opts.arg_file, lfortran_pass_manager,
                 compiler_options);
