@@ -4952,41 +4952,81 @@ ptr_type[ptr_member] = llvm_utils->get_type_from_ttype_t_util(
                 bool is_value_data_only_array = (ASRUtils::is_array(value_type) && (
                       ASRUtils::extract_physical_type(value_type) == ASR::array_physical_typeType::PointerToDataArray ||
                       ASRUtils::extract_physical_type(value_type) == ASR::array_physical_typeType::FixedSizeArray));
-                if( LLVM::is_llvm_pointer(*value_type) ) {
-                    llvm_value = llvm_utils->CreateLoad(llvm_value);
-                }
-                if( is_value_data_only_array ) {
+                // if( LLVM::is_llvm_pointer(*value_type) ) {
+                //     llvm_value = llvm_utils->CreateLoad(llvm_value);
+                // }
+                if( ASRUtils::is_array(value_type) ) {
                     ASR::ttype_t* target_type_ = ASRUtils::type_get_past_pointer(target_type);
                     switch( ASRUtils::extract_physical_type(target_type_) ) {
                         case ASR::array_physical_typeType::DescriptorArray: {
+                            llvm::Type* const array_desc_type = llvm_utils->get_type_from_ttype_t_util(target_type, module.get())->getContainedType(0); 
+                            LCOMPILERS_ASSERT(array_desc_type->isStructTy());
+                            llvm::Type* const dim_desc_type = array_desc_type->getStructElementType(2)->getContainedType(0);
+                            LCOMPILERS_ASSERT(dim_desc_type->isStructTy());
+                            llvm::Value* llvm_target_ = llvm_utils->CreateLoad(llvm_target);
                             if( ASRUtils::extract_physical_type(value_type) == ASR::array_physical_typeType::FixedSizeArray ) {
-                                llvm_value = llvm_utils->create_gep(llvm_value, 0);
+                                llvm::Value* value_data_ptr  = llvm_utils->create_gep(llvm_value, 0); // Pointer to data of the RHS array.
+                                llvm::Value* target_data_ptr = llvm_utils->create_gep2(array_desc_type, llvm_target_, 0); // Pointer to data of the LHS array.
+                                builder->CreateStore(llvm_utils->CreateLoad(value_data_ptr), target_data_ptr);
+                                // Deep Copy dimension descriptor
+
+
+                                // // Copy offset (Use 0 as offset)
+                                // llvm::Value* target_offset = llvm_utils->create_gep2(array_desc_type, llvm_target_, 1); // Pointer to offset of the LHS array.
+                                // builder->CreateStore(llvm::ConstantInt::get(context, llvm::APInt(32, 0)), target_offset);
+
+
+
+                            } else if(ASRUtils::extract_physical_type(value_type) == ASR::array_physical_typeType::DescriptorArray){
+                                llvm_value = llvm_utils->CreateLoad(llvm_value);
+                                // Store exact data pointer
+                                llvm::Value* value_data_ptr = llvm_utils->create_gep2(array_desc_type, llvm_value, 0); // Pointer to data of the RHS array.
+                                llvm::Value* target_data_ptr = llvm_utils->create_gep2(array_desc_type, llvm_target_, 0); // Pointer to data of the LHS array.
+                                builder->CreateStore(llvm_utils->CreateLoad(value_data_ptr), target_data_ptr);
+                                // Deep Copy dimension descriptor
+                                llvm::Value* value_dim_ptr = builder->CreateLoad(dim_desc_type->getPointerTo(),
+                                                                 llvm_utils->create_gep2(array_desc_type, llvm_value, 2)); // Pointer to dimension descriptor of the RHS array.
+                                llvm::Value* target_dim_ptr = builder->CreateLoad(dim_desc_type->getPointerTo(),
+                                                            llvm_utils->create_gep2(array_desc_type, llvm_target_, 2)); // Pointer to dimension descriptor of the LHS array.
+                                llvm::DataLayout data_layout(module->getDataLayout());
+                                int dim_desc_size = (int)data_layout.getTypeAllocSize(dim_desc_type);
+                                builder->CreateMemCpy(target_dim_ptr, llvm::MaybeAlign(8), value_dim_ptr, llvm::MaybeAlign(8), dim_desc_size*n_dims);
+                                // Copy offset
+                                llvm::Value* value_offset = llvm_utils->create_gep2(array_desc_type, llvm_value, 1); // Pointer to offset of the RHS array.
+                                llvm::Value* target_offset = llvm_utils->create_gep2(array_desc_type, llvm_target_, 1); // Pointer to offset of the LHS array.
+                                builder->CreateStore(llvm_utils->CreateLoad(value_offset), target_offset);
+                                // Other fields of the array descriptor should be already set.
+                            } else {
+                                throw CodeGenError("Unsupported association expression", x.base.base.loc);
                             }
-                            llvm::Type* llvm_target_type = llvm_utils->get_type_from_ttype_t_util(target_type_, module.get());
-                            llvm::Value* llvm_target_ = llvm_utils->CreateAlloca(*builder, llvm_target_type);
-                            ASR::dimension_t* m_dims = nullptr;
-                            size_t n_dims = ASRUtils::extract_dimensions_from_ttype(value_type, m_dims);
-                            ASR::ttype_t* data_type = ASRUtils::duplicate_type_without_dims(
-                                                        al, target_type_, target_type_->base.loc);
-                            llvm::Type* llvm_data_type = llvm_utils->get_type_from_ttype_t_util(data_type, module.get());
-                            fill_array_details(llvm_target_, llvm_data_type, m_dims, n_dims, false, false);
-                            builder->CreateStore(llvm_value, arr_descr->get_pointer_to_data(llvm_target_));
-                            llvm_value = llvm_target_;
+                            // llvm::Type* llvm_target_type = llvm_utils->get_type_from_ttype_t_util(target_type_, module.get());
+                            // llvm::Value* llvm_target_ = llvm_utils->CreateAlloca(*builder, llvm_target_type);
+                            // ASR::dimension_t* m_dims = nullptr;
+                            // size_t n_dims = ASRUtils::extract_dimensions_from_ttype(value_type, m_dims);
+                            // ASR::ttype_t* data_type = ASRUtils::duplicate_type_without_dims(
+                            //                             al, target_type_, target_type_->base.loc);
+                            // llvm::Type* llvm_data_type = llvm_utils->get_type_from_ttype_t_util(data_type, module.get());
+                            // fill_array_details(llvm_target_, llvm_data_type, m_dims, n_dims, false, false);
+                            // builder->CreateStore(llvm_value, arr_descr->get_pointer_to_data(llvm_target_));
+                            // llvm_value = llvm_target_;
                             break;
                         }
                         case ASR::array_physical_typeType::FixedSizeArray: {
                             llvm_value = llvm_utils->CreateLoad(llvm_value);
+                            builder->CreateStore(llvm_value, llvm_target);
                             break;
                         }
                         case ASR::array_physical_typeType::PointerToDataArray: {
+                            builder->CreateStore(llvm_value, llvm_target);
                             break;
                         }
                         default: {
                             LCOMPILERS_ASSERT(false);
                         }
                     }
+                } else {
+                    // builder->CreateStore(llvm_value, llvm_target);
                 }
-                builder->CreateStore(llvm_value, llvm_target);
             }
         }
     }
