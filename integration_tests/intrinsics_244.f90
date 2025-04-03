@@ -18,6 +18,7 @@ program intrinsics_244
     print*, cshift(z, shift(3))
     if (any(cshift(z, shift(3)) .neqv. [.false., .true., .false., .true.])) error stop
     print*, cshift(c, shift(4))
+    print *, "is it her"
     if (any(cshift(c, shift(4)) /= ["cd", "de", "ab", "bc"])) error stop
   
     print*, x1
