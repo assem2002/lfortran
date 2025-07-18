@@ -1689,6 +1689,11 @@ RUN(NAME string_56 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc fortran)
 RUN(NAME string_57 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME string_58 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME string_59 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
+RUN(NAME string_60 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
+RUN(NAME string_61 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
+RUN(NAME string_62 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc EXTRAFILES string_62b.f90)
+RUN(NAME string_63 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
+RUN(NAME string_64 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 
 RUN(NAME nested_01 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME nested_02 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
@@ -1769,6 +1774,9 @@ RUN(NAME file_33 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 
 RUN(NAME file_close_01 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 
+RUN(NAME file_open_01 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
+
+
 RUN(NAME inquire_01 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME inquire_02 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME inquire_03 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
@@ -1831,6 +1839,7 @@ RUN(NAME class_54 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME class_55 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc EXTRA_ARGS --realloc-lhs)
 RUN(NAME class_56 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME class_57 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
+RUN(NAME class_58 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME class_58 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 
 RUN(NAME class_procedure_args_01 LABELS gfortran llvm)
@@ -2006,6 +2015,7 @@ RUN(NAME implicit_deallocate_01 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME read_01 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME read_02 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc COPY_TO_BIN read_02_data.txt)
 RUN(NAME read_03 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc COPY_TO_BIN read_03_data.txt)
+RUN(NAME read_04 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 
 RUN(NAME write_01 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc fortran)
 RUN(NAME write_02 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc fortran)
