@@ -51,25 +51,41 @@ end function diag_rsp_mat
 class ReplaceFunctionCall : public ASR::BaseExprReplacer<ReplaceFunctionCall>
 {
 private :
-    // TODO : for sure use a visitor.
-    // It's soooooo hardCoded
-    std::vector<std::pair<ASR::ExternalSymbol_t*,ASR::symbol_t**>> get_externalSymbols(ASR::expr_t* expr){
-        std::vector<std::pair<ASR::ExternalSymbol_t*,ASR::symbol_t**>> externalSymbols_vec;
-        switch (expr->type){
-            case ASR::exprType::StringLen :{
-                ASR::StringLen_t* str_len = ASR::down_cast<ASR::StringLen_t>(expr);
-                return get_externalSymbols(str_len->m_arg);
-            } case ASR::exprType::FunctionCall :{
-                ASR::FunctionCall_t* func_call = ASR::down_cast<ASR::FunctionCall_t>(expr);
-                if(ASR::is_a<ASR::ExternalSymbol_t>(*func_call->m_name)){
-                    return {std::make_pair(ASR::down_cast<ASR::ExternalSymbol_t>(func_call->m_name), &func_call->m_name)};
-                }
-                break;
-            } default :{
-                return externalSymbols_vec;
-            }
+    /*
+        *Used to iterate over the functionCall node (function call in declaration)
+        to get the externalSymbols, so we can duplicate them again in the new helper function
+
+        * e.g. : `character(foo_ret_int(foo_ret_char())) :: str`
+        assume `foo_ret_char` is an externalSymbol in the current function, moving the call into
+        the helper function requires creating an externalSymbol node tailored for the new helper function scope.
+    */ 
+    class getExternalSymbol : public ASR::BaseWalkVisitor<getExternalSymbol>{
+        std::vector<std::pair<ASR::ExternalSymbol_t*,ASR::symbol_t**>> &collected_external_symbols; // Collector
+        public :
+
+        getExternalSymbol
+        (std::vector<std::pair<ASR::ExternalSymbol_t*,ASR::symbol_t**>> &v):collected_external_symbols(v){
+            
         }
-        return externalSymbols_vec;
+        void visit_expr(const ASR::expr_t &x){
+            if(x.type == ASR::FunctionCall){
+                if(ASR::is_a<ASR::ExternalSymbol_t>(*ASR::down_cast<ASR::FunctionCall_t>(&x)->m_name)){
+                    ASR::FunctionCall_t* func_call = ASR::down_cast<ASR::FunctionCall_t>(&x);
+                    collected_external_symbols.push_back({
+                        ASR::down_cast<ASR::ExternalSymbol_t>(func_call->m_name),
+                        &func_call->m_name
+                    });
+                }
+            } 
+            ASR::BaseVisitor<getExternalSymbol>::visit_expr(x);
+        }
+    };
+
+    std::vector<std::pair<ASR::ExternalSymbol_t*,ASR::symbol_t**>> get_externalSymbols(ASR::expr_t* expr){
+        std::vector<std::pair<ASR::ExternalSymbol_t*,ASR::symbol_t**>> v;
+        getExternalSymbol get_external_symbols(v);
+        get_external_symbols.visit_expr(*expr);
+        return v;
     }
 
     void collect_and_create_new_externalSymbols(ASR::expr_t* expr){
