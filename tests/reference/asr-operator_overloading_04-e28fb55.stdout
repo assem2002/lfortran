@@ -57,7 +57,7 @@
                                                     ()
                                                     ()
                                                     Default
-                                                    (String 1 () AssumedLength PointerString)
+                                                    (String 1 () AssumedLength DescriptorString)
                                                     ()
                                                     Source
                                                     Public
@@ -78,7 +78,7 @@
                                             .true.
                                             2 string_type
                                         )
-                                        (String 1 () AssumedLength PointerString)]
+                                        (String 1 () AssumedLength DescriptorString)]
                                         ()
                                         Source
                                         Implementation
@@ -103,15 +103,7 @@
                                             )
                                             ()
                                         )
-                                        (StringPhysicalCast
-                                            (Var 4 rhs)
-                                            PointerString
-                                            DescriptorString
-                                            (Allocatable
-                                                (String 1 () AssumedLength DescriptorString)
-                                            )
-                                            ()
-                                        )
+                                        (Var 4 rhs)
                                         ()
                                         .false.
                                     )]
@@ -271,30 +263,11 @@
                                             2 assign_string_char
                                             2 ~assign
                                             [((Var 5 trimmed_string))
-                                            ((StringPhysicalCast
-                                                (StructInstanceMember
-                                                    (Var 5 string)
-                                                    5 1_string_type_raw
-                                                    (Allocatable
-                                                        (String 1 () DeferredLength DescriptorString)
-                                                    )
-                                                    ()
-                                                )
-                                                DescriptorString
-                                                PointerString
+                                            ((StructInstanceMember
+                                                (Var 5 string)
+                                                5 1_string_type_raw
                                                 (Allocatable
-                                                    (String 1 (StringLen
-                                                        (StructInstanceMember
-                                                            (Var 5 string)
-                                                            5 1_string_type_raw
-                                                            (Allocatable
-                                                                (String 1 () DeferredLength DescriptorString)
-                                                            )
-                                                            ()
-                                                        )
-                                                        (Integer 4)
-                                                        ()
-                                                    ) ExpressionLength PointerString)
+                                                    (String 1 () DeferredLength DescriptorString)
                                                 )
                                                 ()
                                             ))]

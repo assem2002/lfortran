@@ -67,6 +67,7 @@
     )
     (func $7 (type 7) (param) (result)
         (local)
+        i32.const 1
         i32.const 5
         call 6
         i64.extend_i32_s
@@ -77,6 +78,17 @@
         i32.const 0
         call 1
         drop
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
+        i32.const 1
+        i32.const 16
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
+        i32.const 1
         i32.const 5
         i32.const 4
         call 2
@@ -88,6 +100,17 @@
         i32.const 0
         call 1
         drop
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
+        i32.const 1
+        i32.const 16
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
+        i32.const 1
         i64.const 4
         i64.const 5
         call 3
@@ -98,6 +121,17 @@
         i32.const 0
         call 1
         drop
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
+        i32.const 1
+        i32.const 16
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
+        i32.const 1
         i32.const 5
         call 4
         i64.extend_i32_s
@@ -108,11 +142,32 @@
         i32.const 0
         call 1
         drop
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
+        i32.const 1
+        i32.const 16
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
+        i32.const 1
         i32.const 5
         i32.const 4
         call 5
         i64.extend_i32_s
         call 8
+        i32.const 1
+        i32.const 16
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
         i32.const 1
         i32.const 16
         i32.const 1

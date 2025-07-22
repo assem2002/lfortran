@@ -114,7 +114,7 @@
                                                     Default
                                                     (Allocatable
                                                         (Array
-                                                            (String 1 () DeferredLength PointerString)
+                                                            (String 1 () DeferredLength DescriptorString)
                                                             [(()
                                                             ())]
                                                             DescriptorArray
@@ -186,10 +186,10 @@
                                             160
                                             ["# ", "My cool new project!"]
                                             (Array
-                                                (String 1 (IntegerConstant 80 (Integer 4) Decimal) ExpressionLength PointerString)
+                                                (String 1 (IntegerConstant 80 (Integer 4) Decimal) ExpressionLength DescriptorString)
                                                 [((IntegerConstant 1 (Integer 4) Decimal)
                                                 (IntegerConstant 2 (Integer 4) Decimal))]
-                                                FixedSizeArray
+                                                PointerToDataArray
                                             )
                                             ColMajor
                                         )
@@ -199,30 +199,11 @@
                                     (SubroutineCall
                                         2 warnwrite
                                         ()
-                                        [((StringPhysicalCast
-                                            (StructInstanceMember
-                                                (Var 8 settings)
-                                                8 1_fpm_new_settings_name
-                                                (Allocatable
-                                                    (String 1 () DeferredLength DescriptorString)
-                                                )
-                                                ()
-                                            )
-                                            DescriptorString
-                                            PointerString
+                                        [((StructInstanceMember
+                                            (Var 8 settings)
+                                            8 1_fpm_new_settings_name
                                             (Allocatable
-                                                (String 1 (StringLen
-                                                    (StructInstanceMember
-                                                        (Var 8 settings)
-                                                        8 1_fpm_new_settings_name
-                                                        (Allocatable
-                                                            (String 1 () DeferredLength DescriptorString)
-                                                        )
-                                                        ()
-                                                    )
-                                                    (Integer 4)
-                                                    ()
-                                                ) ExpressionLength PointerString)
+                                                (String 1 () DeferredLength DescriptorString)
                                             )
                                             ()
                                         ))
@@ -354,7 +335,7 @@
                                                     ()
                                                     Default
                                                     (Array
-                                                        (String 1 () AssumedLength PointerString)
+                                                        (String 1 () AssumedLength DescriptorString)
                                                         [(()
                                                         ())]
                                                         DescriptorArray
@@ -379,7 +360,7 @@
                                                     ()
                                                     ()
                                                     Default
-                                                    (String 1 () AssumedLength PointerString)
+                                                    (String 1 () AssumedLength DescriptorString)
                                                     ()
                                                     Source
                                                     Public
@@ -394,9 +375,9 @@
                                         })
                                     warnwrite
                                     (FunctionType
-                                        [(String 1 () AssumedLength PointerString)
+                                        [(String 1 () AssumedLength DescriptorString)
                                         (Array
-                                            (String 1 () AssumedLength PointerString)
+                                            (String 1 () AssumedLength DescriptorString)
                                             [(()
                                             ())]
                                             DescriptorArray

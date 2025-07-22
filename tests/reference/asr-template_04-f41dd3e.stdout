@@ -13071,7 +13071,9 @@
                                 ()
                             )]
                             FormatFortran
-                            (String 1 () ExpressionLength CString)
+                            (Allocatable
+                                (String 1 () DeferredLength DescriptorString)
+                            )
                             ()
                         )
                     )
@@ -13130,14 +13132,16 @@
                                 Achar
                                 [(IntegerConstant 10 (Integer 4) Decimal)]
                                 0
-                                (String 1 (IntegerConstant 1 (Integer 4) Decimal) ExpressionLength PointerString)
+                                (String 1 (IntegerConstant 1 (Integer 4) Decimal) ExpressionLength DescriptorString)
                                 (StringConstant
                                     "\n"
-                                    (String 1 (IntegerConstant 1 (Integer 4) Decimal) ExpressionLength PointerString)
+                                    (String 1 (IntegerConstant 1 (Integer 4) Decimal) ExpressionLength DescriptorString)
                                 )
                             )]
                             FormatFortran
-                            (String 1 () ExpressionLength CString)
+                            (Allocatable
+                                (String 1 () DeferredLength DescriptorString)
+                            )
                             ()
                         )
                     )
@@ -13212,7 +13216,9 @@
                                 ()
                             )]
                             FormatFortran
-                            (String 1 () ExpressionLength CString)
+                            (Allocatable
+                                (String 1 () DeferredLength DescriptorString)
+                            )
                             ()
                         )
                     )
@@ -13271,14 +13277,16 @@
                                 Achar
                                 [(IntegerConstant 10 (Integer 4) Decimal)]
                                 0
-                                (String 1 (IntegerConstant 1 (Integer 4) Decimal) ExpressionLength PointerString)
+                                (String 1 (IntegerConstant 1 (Integer 4) Decimal) ExpressionLength DescriptorString)
                                 (StringConstant
                                     "\n"
-                                    (String 1 (IntegerConstant 1 (Integer 4) Decimal) ExpressionLength PointerString)
+                                    (String 1 (IntegerConstant 1 (Integer 4) Decimal) ExpressionLength DescriptorString)
                                 )
                             )]
                             FormatFortran
-                            (String 1 () ExpressionLength CString)
+                            (Allocatable
+                                (String 1 () DeferredLength DescriptorString)
+                            )
                             ()
                         )
                     )
@@ -13639,7 +13647,9 @@
                                 ()
                             )]
                             FormatFortran
-                            (String 1 () ExpressionLength CString)
+                            (Allocatable
+                                (String 1 () DeferredLength DescriptorString)
+                            )
                             ()
                         )
                     )
@@ -13698,14 +13708,16 @@
                                 Achar
                                 [(IntegerConstant 10 (Integer 4) Decimal)]
                                 0
-                                (String 1 (IntegerConstant 1 (Integer 4) Decimal) ExpressionLength PointerString)
+                                (String 1 (IntegerConstant 1 (Integer 4) Decimal) ExpressionLength DescriptorString)
                                 (StringConstant
                                     "\n"
-                                    (String 1 (IntegerConstant 1 (Integer 4) Decimal) ExpressionLength PointerString)
+                                    (String 1 (IntegerConstant 1 (Integer 4) Decimal) ExpressionLength DescriptorString)
                                 )
                             )]
                             FormatFortran
-                            (String 1 () ExpressionLength CString)
+                            (Allocatable
+                                (String 1 () DeferredLength DescriptorString)
+                            )
                             ()
                         )
                     )
@@ -13780,7 +13792,9 @@
                                 ()
                             )]
                             FormatFortran
-                            (String 1 () ExpressionLength CString)
+                            (Allocatable
+                                (String 1 () DeferredLength DescriptorString)
+                            )
                             ()
                         )
                     )
@@ -13839,14 +13853,16 @@
                                 Achar
                                 [(IntegerConstant 10 (Integer 4) Decimal)]
                                 0
-                                (String 1 (IntegerConstant 1 (Integer 4) Decimal) ExpressionLength PointerString)
+                                (String 1 (IntegerConstant 1 (Integer 4) Decimal) ExpressionLength DescriptorString)
                                 (StringConstant
                                     "\n"
-                                    (String 1 (IntegerConstant 1 (Integer 4) Decimal) ExpressionLength PointerString)
+                                    (String 1 (IntegerConstant 1 (Integer 4) Decimal) ExpressionLength DescriptorString)
                                 )
                             )]
                             FormatFortran
-                            (String 1 () ExpressionLength CString)
+                            (Allocatable
+                                (String 1 () DeferredLength DescriptorString)
+                            )
                             ()
                         )
                     )]
@@ -22528,7 +22544,7 @@
                                                         [(ErrorStop
                                                             (StringConstant
                                                                 "n must be > 0"
-                                                                (String 1 (IntegerConstant 13 (Integer 4) Decimal) ExpressionLength PointerString)
+                                                                (String 1 (IntegerConstant 13 (Integer 4) Decimal) ExpressionLength DescriptorString)
                                                             )
                                                         )]
                                                         []
@@ -23631,7 +23647,7 @@
                                                         [(ErrorStop
                                                             (StringConstant
                                                                 "Attempted to sconcat empty list"
-                                                                (String 1 (IntegerConstant 31 (Integer 4) Decimal) ExpressionLength PointerString)
+                                                                (String 1 (IntegerConstant 31 (Integer 4) Decimal) ExpressionLength DescriptorString)
                                                             )
                                                         )]
                                                     )]
@@ -23770,7 +23786,7 @@
                                                         [(ErrorStop
                                                             (StringConstant
                                                                 "n must be > 0"
-                                                                (String 1 (IntegerConstant 13 (Integer 4) Decimal) ExpressionLength PointerString)
+                                                                (String 1 (IntegerConstant 13 (Integer 4) Decimal) ExpressionLength DescriptorString)
                                                             )
                                                         )]
                                                         []

@@ -59,6 +59,7 @@
         local.get 4
         f32.mul
         local.set 2
+        i32.const 1
         local.get 4
         f64.promote_f32
         call 6
@@ -71,6 +72,16 @@
         local.get 2
         f64.promote_f32
         call 6
+        i32.const 1
+        i32.const 16
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
         i32.const 1
         i32.const 16
         i32.const 1
@@ -103,6 +114,7 @@
         local.get 3
         f64.mul
         local.set 1
+        i32.const 1
         local.get 3
         call 6
         i32.const 1
@@ -113,6 +125,16 @@
         drop
         local.get 1
         call 6
+        i32.const 1
+        i32.const 16
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
         i32.const 1
         i32.const 16
         i32.const 1
