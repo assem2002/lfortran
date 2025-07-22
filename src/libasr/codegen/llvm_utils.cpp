@@ -2001,6 +2001,7 @@ namespace LCompilers {
         } else {
             LCOMPILERS_ASSERT_MSG(false, "Not Implemented case : Array size and string length should be compile time constants");
         }
+        return nullptr;
 
     }
     void LLVMUtils::set_array_of_strings_memory_on_heap(
@@ -2179,7 +2180,7 @@ namespace LCompilers {
         /*  Don't depend on null_char.
             Fortran can represent null char is a char not as a terminating flag.
         */
-        int64_t str_len;
+        int64_t str_len = -1;
         ASRUtils::extract_value(ASRUtils::get_string_type(str_const->m_type)->m_len, str_len);
         
         std::string initial_string = std::string(str_const->m_s, str_len); 
