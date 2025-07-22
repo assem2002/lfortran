@@ -2119,7 +2119,7 @@ namespace LCompilers {
                 case ASR::DescriptorArray:
                     str = builder->CreateLoad(
                         get_StringType(ASRUtils::extract_type(type))->getPointerTo(),
-                        arr_api->get_pointer_to_data(array_of_strings));
+                        arr_api->get_pointer_to_data(type, array_of_strings, module));
                     break;
                 case ASR::PointerToDataArray:
                     str = array_of_strings;

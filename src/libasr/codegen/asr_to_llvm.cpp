@@ -578,7 +578,7 @@ public:
                 switch(str_type->m_physical_type){
                     case ASR::DescriptorString : {
                         llvm::Value* temp{};
-                        temp = arr_descr->get_pointer_to_data(str);
+                        temp = arr_descr->get_pointer_to_data(type, str, module.get());
                         temp = builder->CreateLoad(
                             llvm_utils->get_el_type(ASRUtils::extract_type(type), module.get())->getPointerTo(),
                             temp);
