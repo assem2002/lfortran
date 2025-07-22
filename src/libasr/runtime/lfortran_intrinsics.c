@@ -334,7 +334,7 @@ void handle_float(char* format, double val, int scale, char** result, bool use_s
     char dec_str[64];
     sprintf(dec_str, "%.*f", decimal_digits, decimal_part);
     // removing the leading "0." from the formatted decimal part
-    memmove(dec_str, dec_str + 2, strlen(dec_str));
+    memmove(dec_str, dec_str + 2, strlen(dec_str)-1);
 
     // Determine total length needed
     int total_length =  sign_width      + 

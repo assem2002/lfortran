@@ -10870,9 +10870,6 @@ public:
                     Str s; s.from_str_view(result_s);
                     result = s.c_str(al);
                 }
-                int64_t len;
-                LCOMPILERS_ASSERT(ASRUtils::extract_value(ASR::down_cast<ASR::String_t>(dest_value_type)->m_len, len) && 
-                    ((left_value_len+right_value_len) == len))
                 value = ASR::down_cast<ASR::expr_t>(ASR::make_StringConstant_t(
                     al, x.base.base.loc, result, dest_value_type));
             }
