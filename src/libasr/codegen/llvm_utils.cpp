@@ -2086,6 +2086,7 @@ namespace LCompilers {
 
 
     // TODO : Refactor names of the following two functions.
+    
     llvm::Value* LLVMUtils::get_string_element_in_array_(ASR::String_t* str_type, llvm::Value* data, llvm::Value* arr_idx){
 
         llvm::Value* string_len = get_string_length(str_type, data);
