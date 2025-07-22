@@ -35,7 +35,7 @@
             lfortran_error(msg);\
         }
 #else
-    #define lfortran_assert(cond, msg) ((void)0)
+    #define lfortran_assert(cond, msg) ((void)0);
 #endif
 
 #ifdef HAVE_RUNTIME_STACKTRACE
