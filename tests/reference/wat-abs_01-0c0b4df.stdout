@@ -17,9 +17,20 @@
         (local f32)
         f32.const 1.500000
         local.set 0
+        i32.const 1
         local.get 0
         f64.promote_f32
         call 4
+        i32.const 1
+        i32.const 16
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
         i32.const 1
         i32.const 16
         i32.const 1
@@ -43,9 +54,20 @@
         end
         f32.const 1.500000
         local.set 0
+        i32.const 1
         local.get 0
         f64.promote_f32
         call 4
+        i32.const 1
+        i32.const 16
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
         i32.const 1
         i32.const 16
         i32.const 1

@@ -236,7 +236,7 @@
                                                     ()
                                                     ()
                                                     Default
-                                                    (String 1 () AssumedLength PointerString)
+                                                    (String 1 () AssumedLength DescriptorString)
                                                     ()
                                                     Source
                                                     Public
@@ -272,7 +272,7 @@
                                         })
                                     check
                                     (FunctionType
-                                        [(String 1 () AssumedLength PointerString)]
+                                        [(String 1 () AssumedLength DescriptorString)]
                                         (Logical 4)
                                         Source
                                         Implementation
@@ -386,7 +386,7 @@
                                                     ()
                                                     ()
                                                     Default
-                                                    (String 1 () AssumedLength PointerString)
+                                                    (String 1 () AssumedLength DescriptorString)
                                                     ()
                                                     Source
                                                     Public
@@ -422,7 +422,7 @@
                                         })
                                     toml_get_value_type
                                     (FunctionType
-                                        [(String 1 () AssumedLength PointerString)]
+                                        [(String 1 () AssumedLength DescriptorString)]
                                         (Integer 4)
                                         Source
                                         Implementation
@@ -604,7 +604,7 @@
                     [(Print
                         (StringConstant
                             "running derived_types_14 main program"
-                            (String 1 (IntegerConstant 37 (Integer 4) Decimal) ExpressionLength PointerString)
+                            (String 1 (IntegerConstant 37 (Integer 4) Decimal) ExpressionLength DescriptorString)
                         )
                     )]
                 )

@@ -18,6 +18,7 @@
         local.set 0
         i32.const 0
         local.set 1
+        i32.const 1
         local.get 0
         i64.extend_i32_s
         call 3
@@ -30,6 +31,16 @@
         local.get 1
         i64.extend_i32_s
         call 3
+        i32.const 1
+        i32.const 16
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
+        i32.const 1
+        i32.const 0
+        call 1
+        drop
         i32.const 1
         i32.const 16
         i32.const 1
