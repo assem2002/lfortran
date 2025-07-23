@@ -249,7 +249,11 @@ def get_error_diff(reference_file, output_file, full_err_str) -> str:
         shell=True,
         encoding='utf-8')
     diff_str = ""
-    diffs = diff_list.stdout.readlines()
+    try:
+        diffs = diff_list.stdout.readlines()
+    except UnicodeDecodeError as e:
+        print(">>>> Error while decdoing file diff : " + reference_file + "against" + output_file)
+        raise e
     for d in diffs:
         diff_str += d
     full_err_str += f"\nDiff against: {reference_file}\n"
