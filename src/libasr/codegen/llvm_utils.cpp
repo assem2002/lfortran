@@ -1547,11 +1547,6 @@ namespace LCompilers {
         return builder->CreateInBoundsGEP(t, x, idx);
     }
 
-    llvm::Value* LLVMUtils::CreateInBoundsGEP2(ASR::ttype_t *t,
-        llvm::Value *x, std::vector<llvm::Value *> &idx) {
-        llvm::Type* t_ = get_type_from_ttype_t_util(t, module);
-        return builder->CreateInBoundsGEP(t_, x, idx);
-    }
 
     llvm::Function* LLVMUtils::_Deallocate() {
         std::string func_name = "_lfortran_free";
@@ -2044,29 +2039,6 @@ namespace LCompilers {
     }
 
 
-    llvm::Value* LLVMUtils::fetch_string_llvm_var(ASR::Variable_t* x){
-        LCOMPILERS_ASSERT(ASRUtils::is_character(*x->m_type))
-        ASR::String_t* str = ASRUtils::get_string_type(x->m_type);
-        uint32_t x_h = get_hash((ASR::asr_t*)x);
-        LCOMPILERS_ASSERT(llvm_symtab.find(x_h) != llvm_symtab.end());
-
-        if(ASRUtils::is_array(x->m_type)){ // DescriptorArray or PointerToDataArray
-            llvm::Value* array_desc_of_strings = llvm_symtab[x_h];
-            return builder->CreateLoad(
-                get_type_from_ttype_t_util(x->m_type, module),
-                array_desc_of_strings);
-        } else {
-            switch (str->m_physical_type){
-                case ASR::DescriptorString:{
-                    llvm::Value* string_desc = llvm_symtab[x_h];
-                    return string_desc;
-                }
-                default:
-                    throw LCompilersException("Unhandled string physicalType");
-            }
-        }
-        return nullptr;
-    }
     llvm::Value* LLVMUtils::get_stringArray_data(ASR::ttype_t* type, llvm::Value* arr_ptr){
         LCOMPILERS_ASSERT(is_proper_array_of_strings_llvm_var(type, arr_ptr))
         LCOMPILERS_ASSERT(ASRUtils::is_array_of_strings(type))
@@ -2106,8 +2078,9 @@ namespace LCompilers {
         }
     }
 
-    void LLVMUtils::free_strings(ASR::ttype_t* type, 
+    void LLVMUtils::free_strings(ASR::expr_t* expr, 
         llvm::Value* tmp /*ptr to Array of strings OR standalone string*/){
+        ASR::ttype_t* type = ASRUtils::expr_type(expr);
         LCOMPILERS_ASSERT(ASRUtils::is_character(*type))
 
         // Get string representation in the backend (e.g. `i8*` or `string_descriptor*`)
@@ -2120,7 +2093,7 @@ namespace LCompilers {
                 case ASR::DescriptorArray:
                     str = builder->CreateLoad(
                         get_StringType(ASRUtils::extract_type(type))->getPointerTo(),
-                        arr_api->get_pointer_to_data(type, array_of_strings, module));
+                        arr_api->get_pointer_to_data(expr, type, array_of_strings, module));
                     break;
                 case ASR::PointerToDataArray:
                     str = array_of_strings;
@@ -2711,7 +2684,6 @@ llvm::Value* LLVMUtils::handle_global_nonallocatable_stringArray(Allocator& al, 
                 break ;
             }
             case ASR::ttypeType::StructType: {
-                ASR::StructType_t* struct_t = ASR::down_cast<ASR::StructType_t>(asr_src_type);
                 ASR::Struct_t* struct_sym = ASR::down_cast<ASR::Struct_t>(ASRUtils::symbol_get_past_external(ASRUtils::get_struct_sym_from_struct_expr(src_expr)));
                 std::string der_type_name = std::string(struct_sym->m_name);
                 Allocator al(1024);

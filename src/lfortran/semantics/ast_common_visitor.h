@@ -4106,17 +4106,16 @@ public:
                         if (ASR::is_a<ASR::ArrayReshape_t>(*init_expr)) {
                             is_array_reshape = true;
                         }
-                        LCOMPILERS_ASSERT(
-                            !ASRUtils::is_allocatable_or_pointer(type) &&
-                            !ASRUtils::is_allocatable_or_pointer(ASRUtils::expr_type(value)))
                         ASR::String_t *lhs_type = ASR::down_cast<ASR::String_t>(
                             ASRUtils::type_get_past_array(type));
                         ASR::String_t *rhs_type = nullptr;
                         if (is_array_reshape) {
                             ASR::ArrayReshape_t* array_reshape = ASR::down_cast<ASR::ArrayReshape_t>(init_expr);
                             rhs_type = ASR::down_cast<ASR::String_t>(ASRUtils::type_get_past_array(array_reshape->m_type));
-                        }
-                        else {
+                        } else {
+                            LCOMPILERS_ASSERT(
+                                !ASRUtils::is_allocatable_or_pointer(type) &&
+                                !ASRUtils::is_allocatable_or_pointer(ASRUtils::expr_type(value)))
                             rhs_type = ASR::down_cast<ASR::String_t>(
                                 ASRUtils::type_get_past_array(ASRUtils::expr_type(value)));
                         }

@@ -410,7 +410,7 @@ namespace LCompilers {
                 Frees Strings.
                 whether it is a single string or an array of strings.
             */
-            void free_strings(ASR::ttype_t* type, llvm::Value* tmp);
+            void free_strings(ASR::expr_t* expr, llvm::Value* tmp);
 
             /*
                 *String copying src into destination,

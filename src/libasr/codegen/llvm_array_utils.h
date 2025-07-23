@@ -302,7 +302,7 @@ namespace LCompilers {
                     bool polymorphic=false, llvm::Type* polymorphic_type=nullptr, bool is_unbounded_pointer_to_data = false) = 0;
 
                 virtual
-                llvm::Value* get_is_allocated_flag(llvm::Value* array, llvm::Type* llvm_data_type, ASR::ttype_t* array_type) = 0;
+                llvm::Value* get_is_allocated_flag(llvm::Value* array, llvm::Type* llvm_data_type, ASR::expr_t* array_exp) = 0;
 
                 virtual
                 void reset_is_allocated_flag(llvm::Value* array, llvm::Type* llvm_data_type) = 0;
@@ -497,7 +497,7 @@ namespace LCompilers {
                     bool polymorphic=false, llvm::Type* polymorphic_type=nullptr, bool is_unbounded_pointer_to_data = false);
 
                 virtual
-                llvm::Value* get_is_allocated_flag(llvm::Value* array, llvm::Type* llvm_data_type, ASR::ttype_t* array_type);
+                llvm::Value* get_is_allocated_flag(llvm::Value* array, llvm::Type* llvm_data_type, ASR::expr_t* array_exp);
 
                 virtual
                 void reset_is_allocated_flag(llvm::Value* array, llvm::Type* llvm_data_type);
