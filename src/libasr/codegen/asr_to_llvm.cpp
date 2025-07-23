@@ -8021,10 +8021,12 @@ public:
         } else if (x.m_old == ASR::string_physical_typeType::CChar &&
             x.m_new == ASR::string_physical_typeType::DescriptorString){
             this->visit_expr_load_wrapper(x.m_arg, 0);// Typically a bind-C-function return 
+            
             int len = -1;
             bool is_const_len = ASRUtils::extract_value(
                 ASRUtils::get_string_type(x.m_arg)->m_len, len);
-            LCOMPILERS_ASSERT(is_const_len);
+            if(!is_const_len) throw LCompilersException("Unhandled CChar string physical type with non constant length");
+
             tmp = llvm_utils->create_string_descriptor(tmp,
                 llvm::ConstantInt::get(context, llvm::APInt(64, len)),"stringCast_desc");
         } else {
