@@ -2860,8 +2860,9 @@ LFORTRAN_API char* _lfortran_strcat(
 LFORTRAN_API void _lfortran_copy_str_and_pad(
     char* lhs, int64_t lhs_len,
     char* rhs, int64_t rhs_len){
+
     lfortran_assert(lhs != NULL, "Run-time Error : Copying into unallocated LHS string")
-    lfortran_assert(rhs != NULL, "Run-time Error : Copying from unallocated RHS string")
+    if(rhs == NULL) lfortran_error("Run-time Error : Copying from unallocated RHS string");
 
     for (int64_t i = 0; i < lhs_len; i++) {
         if (i < rhs_len) {

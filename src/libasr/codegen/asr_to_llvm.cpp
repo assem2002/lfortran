@@ -10227,7 +10227,7 @@ public:
             if(x.n_values  == 0){ // TODO : We should remove any function that creates a `FileWrite` with no args
                 llvm::Value *fmt_ptr = builder->CreateGlobalStringPtr("%s");
                 llvm::Value* end{};
-                if (x.m_end) { this->visit_expr_wrapper(x.m_end, true); end = tmp; }
+                if (x.m_end) { end = get_string_data(x.m_end); }
                 printf(context, *module, *builder, {fmt_ptr, end});
             } else if (x.n_values == 1){
                 handle_print(x.m_values[0], x.m_end);
