@@ -8021,7 +8021,7 @@ public:
         } else if (x.m_old == ASR::string_physical_typeType::CChar &&
             x.m_new == ASR::string_physical_typeType::DescriptorString){
             this->visit_expr_load_wrapper(x.m_arg, 0);// Typically a bind-C-function return 
-            
+
             int len = -1;
             bool is_const_len = ASRUtils::extract_value(
                 ASRUtils::get_string_type(x.m_arg)->m_len, len);
@@ -10218,16 +10218,13 @@ public:
         }
 
         if (x.m_unit == nullptr) {
-            llvm::Value* end = nullptr;
-            if (x.m_end) {
-                this->visit_expr_wrapper(x.m_end, true);
-                end = tmp;
-            }
             if(x.n_values  == 0){ // TODO : We should remove any function that creates a `FileWrite` with no args
                 llvm::Value *fmt_ptr = builder->CreateGlobalStringPtr("%s");
+                llvm::Value* end{};
+                if (x.m_end) { this->visit_expr_wrapper(x.m_end, true); end = tmp; }
                 printf(context, *module, *builder, {fmt_ptr, end});
             } else if (x.n_values == 1){
-                handle_print(x.m_values[0], end);
+                handle_print(x.m_values[0], x.m_end);
             } else {
                 throw CodeGenError("File write should have single argument of type character)", x.base.base.loc);
             }
@@ -10632,12 +10629,15 @@ public:
         }
     }
 
-    void handle_print(ASR::expr_t* arg, llvm::Value* end) {
+    void handle_print(ASR::expr_t* arg, ASR::expr_t* end_expr) {
         std::vector<llvm::Value *> args;
         args.push_back(nullptr); // reserve space for fmt_str
         std::vector<std::string> fmt;
-        if(end == nullptr){
+        llvm::Value* end{};
+        if(end_expr == nullptr){
             end = builder->CreateGlobalStringPtr("\n");
+        } else {
+            end = get_string_data(end_expr);
         }
         compute_fmt_specifier_and_arg(fmt, args, arg, arg->base.loc);
         fmt.push_back("%s");
