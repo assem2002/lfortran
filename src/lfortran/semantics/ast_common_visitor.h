@@ -7182,7 +7182,7 @@ public:
 
         { // Try to get expression's string length (if exist)
             ASR::String_t* string_t = ASRUtils::get_string_type(ASRUtils::expr_type(v));
-            int64_t len;
+            int64_t len = -1;
             if( ASRUtils::extract_value(string_t->m_len, len) ) {
                 len_compiletime = make_ConstantWithType(make_IntegerConstant_t, len, type, loc);
             } else {

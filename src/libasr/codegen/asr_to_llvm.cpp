@@ -9795,23 +9795,29 @@ public:
                     }
                     llvm::Function* fn = module->getFunction(runtime_func_name);
                     if (!fn) {
-                        llvm::ArrayRef<llvm::Type*> arg_types;
+                        llvm::FunctionType *function_type;
                         if(ASRUtils::is_string_only(type)){
-                            arg_types = {
-                                character_type /*src_data*/,
-                                llvm::Type::getInt64Ty(context) /*src_length*/,
-                                character_type /*dest_data*/,
-                                llvm::Type::getInt64Ty(context) /*dest_length*/
-                            };
+                            function_type = llvm::FunctionType::get(
+                                llvm::Type::getVoidTy(context),
+                                {
+                                    character_type /*src_data*/,
+                                    llvm::Type::getInt64Ty(context) /*src_length*/,
+                                    character_type /*dest_data*/,
+                                    llvm::Type::getInt64Ty(context) /*dest_length*/
+                                },
+                                false);
                         } else {
-                            arg_types = {
-                                character_type /*src_data*/, llvm::Type::getInt64Ty(context)/*src_length*/,
-                                character_type,
-                                llvm_utils->get_type_from_ttype_t_util(x.m_values[i], type, module.get())->getPointerTo()
-                            };
+                            function_type = llvm::FunctionType::get(
+                                llvm::Type::getVoidTy(context),
+                                {   character_type /*src_data*/,
+                                    llvm::Type::getInt64Ty(context)/*src_length*/,
+                                    character_type,
+                                    llvm_utils->get_type_from_ttype_t_util(
+                                        x.m_values[i], type, module.get()
+                                    )->getPointerTo()
+                                },
+                                false);
                         }
-                        llvm::FunctionType *function_type = llvm::FunctionType::get(
-                                llvm::Type::getVoidTy(context), arg_types, false);
                         fn = llvm::Function::Create(function_type,
                                 llvm::Function::ExternalLinkage, runtime_func_name, *module);
                     }

@@ -4835,8 +4835,12 @@ LFORTRAN_API void _lfortran_read_array_char(char *p, int64_t length, int array_s
         sprintf(length_format, "%%%"PRId64, length);
         strcat(length_format, "s");
         for(int i = 0; i < array_size; i++){
-            fscanf(filep, length_format, p+(i*(length+null_c_len))); // Read exactly length 
-            fscanf(filep, "%*[^\n \t]"); // Consume rest but `\n`, ` `, `\t`
+            {
+                int scan_ret = 0;
+                scan_ret = fscanf(filep, length_format, p+(i*(length+null_c_len))); // Read exactly length 
+                if(scan_ret != 1) {lfortran_error("Invalid read (scan)");}
+            }
+            (void)!fscanf(filep, "%*[^\n \t]"); // Consume the rest of character but ( '\n', ' ', '\t' )
         }
     }
 
