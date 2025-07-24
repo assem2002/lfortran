@@ -1902,8 +1902,9 @@ namespace LCompilers {
 
     std::pair<llvm::Value*, llvm::Value*> LLVMUtils::get_string_length_data(ASR::String_t* str_type, llvm::Value* str,
         bool get_pointer_to_data, bool get_pointer_to_len){
-        return std::make_pair(get_string_data(str_type, str, get_pointer_to_data),
-                       get_string_length(str_type, str, get_pointer_to_len));
+        llvm::Value* data = get_string_data(str_type, str, get_pointer_to_data);
+        llvm::Value* len = get_string_length(str_type, str, get_pointer_to_len);
+        return std::make_pair(data, len);
     }
 
 
