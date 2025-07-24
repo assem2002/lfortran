@@ -1,3 +1,4 @@
+! Note : gfortran fails for this, most of the other compiler don't
 program string_58
     character(:), pointer :: str
     character(10), target :: str2
