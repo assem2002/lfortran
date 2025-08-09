@@ -269,6 +269,46 @@ namespace LCompilers {
             llvm::Constant* create_llvm_constant_from_asr_expr(ASR::expr_t* expr,
                                                                llvm::Module* module);
 
+            template<typename... Args>
+            void generate_runtime_error(llvm::Value* cond, std::string message, Args... args)
+            {
+                llvm::Function *fn = builder->GetInsertBlock()->getParent();
+
+                llvm::BasicBlock *thenBB = llvm::BasicBlock::Create(context, "then", fn);
+                llvm::BasicBlock *mergeBB = llvm::BasicBlock::Create(context, "ifcont");
+
+                builder->CreateCondBr(cond, thenBB, mergeBB);
+                builder->SetInsertPoint(thenBB); {
+                        llvm::Value* formatted_msg = builder->CreateGlobalStringPtr(message);
+                        llvm::Function* print_error_fn = module->getFunction("_lcompilers_print_error");
+                        if (!print_error_fn) {
+                            llvm::FunctionType* error_fn_type = llvm::FunctionType::get(
+                                llvm::Type::getVoidTy(context),
+                                {llvm::Type::getInt8Ty(context)->getPointerTo()},
+                                true);
+                            print_error_fn = llvm::Function::Create(error_fn_type,
+                                llvm::Function::ExternalLinkage, "_lcompilers_print_error", module);
+                        }
+
+                        std::vector<llvm::Value*> vec = {formatted_msg, args...};
+                        builder->CreateCall(print_error_fn, vec);
+
+                        llvm::Function* exit_fn = module->getFunction("exit");
+                        if (!exit_fn) {
+                            llvm::FunctionType* exit_fn_type = llvm::FunctionType::get(
+                                llvm::Type::getVoidTy(context),
+                                {llvm::Type::getInt32Ty(context)},
+                                false);
+                            exit_fn = llvm::Function::Create(exit_fn_type,
+                                llvm::Function::ExternalLinkage, "exit", module);
+                        }
+
+                        builder->CreateCall(exit_fn, {llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), 1)});
+                        builder->CreateUnreachable();
+                }
+                start_new_block(mergeBB);
+            }
+
             /*
              * Initialize string with empty characters.
             */
@@ -462,9 +502,6 @@ namespace LCompilers {
             llvm::Type* getStructType(ASR::Struct_t* der_type, llvm::Module* module, bool is_pointer=false);
 
             llvm::Type* getUnion(ASR::Union_t* union_type,
-                llvm::Module* module, bool is_pointer=false);
-
-            llvm::Type* getUnion(ASR::ttype_t* _type,
                 llvm::Module* module, bool is_pointer=false);
 
             llvm::Type* getClassType(ASR::Struct_t* der_type, bool is_pointer=false);
