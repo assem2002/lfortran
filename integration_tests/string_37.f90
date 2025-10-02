@@ -5,6 +5,7 @@ program string_37
     if (max(maybe(string), 'works') /= 'works') error stop 
     string2 => cast_to_string()
     string = string2
+    print *, string2
     if (string /= "Hello") error stop
     contains
 
@@ -17,5 +18,12 @@ program string_37
         character(len=5), target :: str2
         str2 = "Hello"
         str => str2
+        if(str /= "Hello") error stop
+        
+        nullify(str)
+        
+        ! Allocate memory to avoid dangling pointer
+        allocate(character(len=5) :: str)
+        str = "Hello"
     end function cast_to_string
 end

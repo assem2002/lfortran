@@ -63,53 +63,16 @@ public :
 
     void replace_FunctionCall(ASR::FunctionCall_t* x){
         traverse_functionCall_args(x->m_args, x->n_args);
-        if(PassUtils::is_non_primitive_return_type(x->m_type)){ // Arrays and structs are handled by the array_struct_temporary. No need to check for them here.
+
+        if(ASRUtils::is_array(x->m_type) || ASRUtils::is_string_only(x->m_type) || ASRUtils::is_struct(*x->m_type)){
+            /* No need to create temp; `array_struct_temporary` creates them. Assigment visitors handles the creation of subCall. */
+            return; 
+        } 
+        if(PassUtils::is_non_primitive_return_type(x->m_type)){
             // Create variable in current_scope to be holding the return + Deallocate.
             ASR::expr_t* result_var = PassUtils::create_var(result_counter++,
                 "_func_call_res", x->base.base.loc, ASRUtils::duplicate_type(al, x->m_type), al, current_scope);
-            if(ASRUtils::is_allocatable(result_var)){
-                insert_implicit_deallocate(result_var);
-            }
-            // Create allocate statement if needed
-            if(ASRUtils::is_string_only(x->m_type)){ 
-                ASR::String_t* str = ASRUtils::get_string_type(result_var);
-                if( str->m_len &&
-                !ASRUtils::is_value_constant(str->m_len) &&
-                !ASRUtils::is_allocatable(result_var)){ // Corresponds to -> `character(n) :: str` (Non-allocatable string of non-compile-time length)
-                    ASR::expr_t* len_expr_to_allocate_with = str->m_len; // length Expression
-                    {
-                    /*
-                        Replace allocate length (could be a functionCall).
-                        TODO :: Do proper replacement if functionCall is dependant on FunctionParam from the current functionCall,
-                        as the current visit does redundant functionCall replacement(FunctionCall + variable).
-                    */ 
-                        ASR::expr_t** current_expr_copy = current_expr;
-                        current_expr = &len_expr_to_allocate_with;
-                        replace_expr(len_expr_to_allocate_with);
-                        current_expr = current_expr_copy;
-                    }
-                    // Modify String info to be deferred allocatable string
-                    str->m_len = nullptr; str->m_len_kind = ASR::DeferredLength;str->m_physical_type = ASR::DescriptorString;
-                    ASRUtils::EXPR2VAR(result_var)->m_type =
-                        ASRUtils::TYPE(ASR::make_Allocatable_t(al, str->base.base.loc, ASRUtils::EXPR2VAR(result_var)->m_type));
-
-                    // Make an implicit deallocate before allocating the return var (handles when allocate is in a do while loop)
-                    insert_implicit_deallocate(result_var);
-
-                    // Create allocate statement
-                    Vec<ASR::alloc_arg_t> v;
-                    v.reserve(al, 1);
-                    ASR::alloc_arg_t alloc_arg{};
-                    alloc_arg.m_a = result_var;
-                    alloc_arg.m_dims = nullptr;
-                    alloc_arg.n_dims = 0;
-                    alloc_arg.m_len_expr = len_expr_to_allocate_with;
-                    alloc_arg.m_type = nullptr;
-                    v.push_back(al, alloc_arg);
-                    pass_result.push_back(al,
-                        ASRUtils::STMT(ASR::make_Allocate_t(al, str->base.base.loc, v.p, 1, nullptr, nullptr, nullptr)));    
-                }
-            }
+            if(ASRUtils::is_allocatable(result_var)) { insert_implicit_deallocate(result_var); }
             // Create new call args with `result_var` as last argument capturing return + Create a `subroutineCall`.
             Vec<ASR::call_arg_t> new_call_args;
             new_call_args.reserve(al,1);

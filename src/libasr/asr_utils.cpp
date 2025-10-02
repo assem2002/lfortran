@@ -389,6 +389,9 @@ ASR::symbol_t* get_struct_sym_from_struct_expr(ASR::expr_t* expression)
             // These do not have a struct symbol, return nullptr
             return nullptr;
         }
+        case ASR::exprType::StringFormat:{ // Always returns string
+            return nullptr;
+        }
         case ASR::exprType::BitCast: {
             ASR::BitCast_t* bit_cast = ASR::down_cast<ASR::BitCast_t>(expression);
             return ASRUtils::symbol_get_past_external(ASRUtils::get_struct_sym_from_struct_expr(bit_cast->m_source));

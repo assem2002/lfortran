@@ -5686,8 +5686,7 @@ public:
             uint32_t h = get_hash((ASR::asr_t*)asr_retval);
             llvm::Value *ret_val = llvm_symtab[h];
             llvm::Value *ret_val2 = ret_val;
-            if (!ASRUtils::is_class_type(ASRUtils::extract_type(asr_retval->m_type)) &&
-                !(ASR::is_a<ASR::Pointer_t>(*asr_retval->m_type) && ASR::is_a<ASR::String_t>(*ASRUtils::extract_type(asr_retval->m_type))) ) {
+            if (!ASRUtils::is_class_type(ASRUtils::extract_type(asr_retval->m_type))) {
                 llvm::Type* asr_retval_llvm_type = llvm_utils->get_type_from_ttype_t_util(ASRUtils::EXPR(ASR::make_Var_t(
                     al, asr_retval->base.base.loc, &asr_retval->base)), asr_retval->m_type, module.get());
                 ret_val2 = llvm_utils->CreateLoad2(asr_retval_llvm_type, ret_val);
@@ -7114,7 +7113,7 @@ public:
             m_value = ASR::down_cast<ASR::ArraySection_t>(m_value)->m_v;
         }
         int ptr_loads_copy = ptr_loads;
-        if(ASRUtils::is_character(*value_type)){
+        if(ASRUtils::is_string_only(value_type) /*String. No StringArray*/){
             ptr_loads = 0;
         } else if(ASRUtils::is_array(value_type)){
             ptr_loads = 1;

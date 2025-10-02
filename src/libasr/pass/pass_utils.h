@@ -162,7 +162,9 @@ namespace LCompilers {
             allocatable string, allocatable integer, etc.. */
         static inline bool is_non_primitive_return_type(ASR::ttype_t* x){
             // TODO : Handle other allocatable types and fixed strings.
-            return ASRUtils::is_descriptorString(x) || 
+            
+            if(ASRUtils::is_pointer(x)) return false;
+            return ASRUtils::is_character(*x) || 
                     (x && (ASR::is_a<ASR::List_t>(*x) 
                        || ASR::is_a<ASR::Dict_t>(*x)
                        || ASR::is_a<ASR::Set_t>(*x)
