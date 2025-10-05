@@ -4998,7 +4998,9 @@ namespace StringConcat {
         char intrinsic_fn_name[] = "_lcompilers_stringconcat";
         if(ASR::symbol_t* f_sym = scope->resolve_symbol(intrinsic_fn_name)){ //Avoid duplication
             ASRBuilder b(al, loc);
-            return b.Call(f_sym, new_args, b.String(nullptr, ASR::DeferredLength), nullptr);
+            ASR::expr_t* f_call = b.Call(f_sym, new_args, ASRUtils::get_FunctionType(f_sym)->m_return_var_type, nullptr);
+            FuncParamToArgReplacer::replace(al, ASR::down_cast<ASR::FunctionCall_t>(f_call));
+            return f_call;
         }
         
         declare_basic_variables(intrinsic_fn_name)

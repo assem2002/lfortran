@@ -1,4 +1,4 @@
-module sj0m_volatile_01
+   module sj0m_volatile_01
    implicit none
    integer, parameter :: m90_sngl = kind(1.e0)
    contains

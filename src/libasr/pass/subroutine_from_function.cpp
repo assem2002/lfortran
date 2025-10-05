@@ -1,3 +1,4 @@
+#include "libasr/assert.h"
 #include <libasr/asr.h>
 #include <libasr/containers.h>
 #include <libasr/exception.h>
@@ -8,6 +9,7 @@
 #include <libasr/pass/intrinsic_array_function_registry.h>
 #include <libasr/pass/pass_utils.h>
 #include <libasr/pass/array_struct_temporary.h>
+
 
 namespace LCompilers {
 
@@ -35,6 +37,7 @@ class CreateFunctionFromSubroutine: public ASR::BaseWalkVisitor<CreateFunctionFr
 class ReplaceFunctionCallWithSubroutineCall:
     public ASR::BaseExprReplacer<ReplaceFunctionCallWithSubroutineCall> {
 private :
+    std::stack<const ASR::Assignment_t*> &assignment_stack; // Look at the comment in visitor class.
     void insert_implicit_deallocate(ASR::expr_t* result_var) {
         Vec<ASR::expr_t*> to_be_deallocated;
         to_be_deallocated.reserve(al, 1);
@@ -49,8 +52,9 @@ public :
     int result_counter = 0;
     SymbolTable* current_scope;
     Vec<ASR::stmt_t*> &pass_result;
-    ReplaceFunctionCallWithSubroutineCall(Allocator& al_, Vec<ASR::stmt_t*> &pass_result_) :
-        al(al_),pass_result(pass_result_) {}
+    ReplaceFunctionCallWithSubroutineCall(
+        Allocator& al_, Vec<ASR::stmt_t*> &pass_result_, std::stack<const ASR::Assignment_t*> &assignment_stack_):
+        assignment_stack(assignment_stack_), al(al_), pass_result(pass_result_) {}
 
     void traverse_functionCall_args(ASR::call_arg_t* call_args, size_t call_args_n){
         for(size_t i = 0; i < call_args_n; i++){
@@ -63,53 +67,16 @@ public :
 
     void replace_FunctionCall(ASR::FunctionCall_t* x){
         traverse_functionCall_args(x->m_args, x->n_args);
-        if(PassUtils::is_non_primitive_return_type(x->m_type)){ // Arrays and structs are handled by the array_struct_temporary. No need to check for them here.
+
+        if(ASRUtils::is_array(x->m_type) ||ASRUtils::is_struct(*x->m_type)){
+            /* No need to create temp; `array_struct_temporary` creates them. Assigment visitors handles the creation of subCall. */
+            return; 
+        }
+        if(PassUtils::is_non_primitive_return_type(x->m_type)){
             // Create variable in current_scope to be holding the return + Deallocate.
             ASR::expr_t* result_var = PassUtils::create_var(result_counter++,
                 "_func_call_res", x->base.base.loc, ASRUtils::duplicate_type(al, x->m_type), al, current_scope);
-            if(ASRUtils::is_allocatable(result_var)){
-                insert_implicit_deallocate(result_var);
-            }
-            // Create allocate statement if needed
-            if(ASRUtils::is_string_only(x->m_type)){ 
-                ASR::String_t* str = ASRUtils::get_string_type(result_var);
-                if( str->m_len &&
-                !ASRUtils::is_value_constant(str->m_len) &&
-                !ASRUtils::is_allocatable(result_var)){ // Corresponds to -> `character(n) :: str` (Non-allocatable string of non-compile-time length)
-                    ASR::expr_t* len_expr_to_allocate_with = str->m_len; // length Expression
-                    {
-                    /*
-                        Replace allocate length (could be a functionCall).
-                        TODO :: Do proper replacement if functionCall is dependant on FunctionParam from the current functionCall,
-                        as the current visit does redundant functionCall replacement(FunctionCall + variable).
-                    */ 
-                        ASR::expr_t** current_expr_copy = current_expr;
-                        current_expr = &len_expr_to_allocate_with;
-                        replace_expr(len_expr_to_allocate_with);
-                        current_expr = current_expr_copy;
-                    }
-                    // Modify String info to be deferred allocatable string
-                    str->m_len = nullptr; str->m_len_kind = ASR::DeferredLength;str->m_physical_type = ASR::DescriptorString;
-                    ASRUtils::EXPR2VAR(result_var)->m_type =
-                        ASRUtils::TYPE(ASR::make_Allocatable_t(al, str->base.base.loc, ASRUtils::EXPR2VAR(result_var)->m_type));
-
-                    // Make an implicit deallocate before allocating the return var (handles when allocate is in a do while loop)
-                    insert_implicit_deallocate(result_var);
-
-                    // Create allocate statement
-                    Vec<ASR::alloc_arg_t> v;
-                    v.reserve(al, 1);
-                    ASR::alloc_arg_t alloc_arg{};
-                    alloc_arg.m_a = result_var;
-                    alloc_arg.m_dims = nullptr;
-                    alloc_arg.n_dims = 0;
-                    alloc_arg.m_len_expr = len_expr_to_allocate_with;
-                    alloc_arg.m_type = nullptr;
-                    v.push_back(al, alloc_arg);
-                    pass_result.push_back(al,
-                        ASRUtils::STMT(ASR::make_Allocate_t(al, str->base.base.loc, v.p, 1, nullptr, nullptr, nullptr)));    
-                }
-            }
+            if(ASRUtils::is_allocatable(result_var)) { insert_implicit_deallocate(result_var); }
             // Create new call args with `result_var` as last argument capturing return + Create a `subroutineCall`.
             Vec<ASR::call_arg_t> new_call_args;
             new_call_args.reserve(al,1);
@@ -135,10 +102,19 @@ class ReplaceFunctionCallWithSubroutineCallVisitor:
         bool remove_original_statement = false;
         Vec<ASR::stmt_t*>* parent_body = nullptr;
 
+        /*  *Used to track assignment node (only when `value` is funcCall),
+                to know if temporary is needed for the funcCall or not.
+            *While Replacing FuncCall we check if it's part of the assignment in the stack top.
+                - If Yes, Use the target of the assignment and pass it the converted function (subroutine).
+                - If No, Create a temporary variable and use it.
+            *Proabably we can just use a variable instead, but stack is more general. 
+        */
+        std::stack<const ASR::Assignment_t*> assignment_stack;
 
     public:
 
-        ReplaceFunctionCallWithSubroutineCallVisitor(Allocator& al_): al(al_), replacer(al, pass_result)
+        ReplaceFunctionCallWithSubroutineCallVisitor(Allocator& al_):
+        al(al_), replacer(al, pass_result, assignment_stack)
         {
             pass_result.n = 0;
             pass_result.reserve(al, 1);
@@ -174,6 +150,7 @@ class ReplaceFunctionCallWithSubroutineCallVisitor:
                 if (!remove_original_statement){
                     body.push_back(al, m_body[i]);
                 }
+                LCOMPILERS_ASSERT(assignment_stack.empty() == true) // stack should be empty after statement visit.
             }
             remove_original_statement = remove_original_statement_copy;
             m_body = body.p;
@@ -266,12 +243,14 @@ class ReplaceFunctionCallWithSubroutineCallVisitor:
         }
 
         void visit_Assignment(const ASR::Assignment_t &x) {
+            if(ASR::is_a<ASR::FunctionCall_t>(x.m_value)) {assignment_stack.push(&x);}
             ASR::CallReplacerOnExpressionsVisitor \
             <ReplaceFunctionCallWithSubroutineCallVisitor>::visit_Assignment(x);
             if(is_function_call_returning_aggregate_type(x.m_value)) {
                 ASR::Assignment_t& xx = const_cast<ASR::Assignment_t&>(x);
                 subroutine_call_from_function(x.base.base.loc, (ASR::stmt_t &)xx);
             }
+            if(ASR::is_a<ASR::FunctionCall_t>(x.m_value)) {assignment_stack.pop();}
         }
 
         void visit_Associate(const ASR::Associate_t &x) {

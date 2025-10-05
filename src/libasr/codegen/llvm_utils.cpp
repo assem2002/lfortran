@@ -1044,7 +1044,8 @@ namespace LCompilers {
                     return_type = llvm::Type::getVoidTy(context)->getPointerTo();
                     break;
                 case (ASR::ttypeType::Pointer) : {
-                    return_type = get_type_from_ttype_t_util(x.m_return_var, ASRUtils::get_contained_type(return_var_type0), module)->getPointerTo();
+                    return_type = get_type_from_ttype_t_util(x.m_return_var, ASRUtils::get_contained_type(return_var_type0), module);
+                    return_type = ASRUtils::is_string_only(return_var_type0) ? return_type : return_type->getPointerTo();
                     break;
                 }
                 case (ASR::ttypeType::Allocatable) : {
@@ -2137,7 +2138,7 @@ namespace LCompilers {
     }
 
 
-    llvm::Value* LLVMUtils::get_stringArray_data(ASR::ttype_t* type, llvm::Value* arr_ptr){
+    llvm::Value* LLVMUtils::get_stringArray_data(ASR::ttype_t* type, llvm::Value* arr_ptr, bool get_pointer_to_data /*Default False*/){
         LCOMPILERS_ASSERT(is_proper_array_of_strings_llvm_var(type, arr_ptr))
         LCOMPILERS_ASSERT(ASRUtils::is_array_of_strings(type))
         ASR::Array_t* arr = ASR::down_cast<ASR::Array_t>(ASRUtils::type_get_past_allocatable_pointer(type));
@@ -2147,16 +2148,16 @@ namespace LCompilers {
                 llvm::Value* str_desc = builder->CreateLoad(
                     get_StringType(ASRUtils::extract_type(type))->getPointerTo(),
                     arr_api->get_pointer_to_data(arr_ptr));
-                return get_string_data(str, str_desc);
+                return get_string_data(str, str_desc, get_pointer_to_data);
             }
             case ASR::PointerArray:{
-                return get_string_data(str, arr_ptr);
+                return get_string_data(str, arr_ptr, get_pointer_to_data);
             }
             default:
                 throw LCompilersException("Unhandled Array Physical Type");
         }
     }
-    llvm::Value* LLVMUtils::get_stringArray_length(ASR::ttype_t* type, llvm::Value* arr_ptr){
+    llvm::Value* LLVMUtils::get_stringArray_length(ASR::ttype_t* type, llvm::Value* arr_ptr, bool get_pointer_to_len /*Default False*/){
         LCOMPILERS_ASSERT(is_proper_array_of_strings_llvm_var(type, arr_ptr))
         LCOMPILERS_ASSERT(ASRUtils::is_array_of_strings(type))
         ASR::Array_t* arr = ASR::down_cast<ASR::Array_t>(ASRUtils::type_get_past_allocatable_pointer(type));
@@ -2166,10 +2167,10 @@ namespace LCompilers {
                 llvm::Value* str_desc = builder->CreateLoad(
                     get_StringType(ASRUtils::extract_type(type))->getPointerTo(),
                     arr_api->get_pointer_to_data(arr_ptr));
-                return get_string_length(str, str_desc);
+                return get_string_length(str, str_desc, get_pointer_to_len);
             }
             case ASR::PointerArray:{
-                return get_string_length(str, arr_ptr);
+                return get_string_length(str, arr_ptr, get_pointer_to_len);
             }
             default:
                 throw LCompilersException("Unhandled Array Physical Type");
@@ -2207,7 +2208,7 @@ namespace LCompilers {
         std::tie(str_data, str_len) = get_string_length_data(ASRUtils::get_string_type(type), str, true, true);
         builder->CreateCall(_Deallocate(),{builder->CreateLoad(character_type, str_data)});
         builder->CreateStore(llvm::ConstantPointerNull::getNullValue(character_type), str_data);
-        builder->CreateStore(llvm::ConstantInt::get(llvm::Type::getInt64Ty(context),0), str_len);
+        builder->CreateStore(llvm::ConstantInt::get(llvm::Type::getInt64Ty(context),0), str_len); // TODO :: NOT all strings should have its length set to `0` -- `character(20), allocatable::str`
     }
 
 

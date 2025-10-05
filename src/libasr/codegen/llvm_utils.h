@@ -454,7 +454,7 @@ namespace LCompilers {
                 * e.g. --> `character(100) :: arr_of_strings(7)`
                   Returns `i8*`
             */
-            llvm::Value* get_stringArray_data(ASR::ttype_t* type, llvm::Value* arr_ptr);
+            llvm::Value* get_stringArray_data(ASR::ttype_t* type, llvm::Value* arr_ptr, bool get_pointer_to_data=false);
             
             /*
                 * Gets string length of array of strings
@@ -462,7 +462,7 @@ namespace LCompilers {
                 * e.g. --> `character(100) :: arr_of_strings(7)`
                 * Returns `int64`
             */
-            llvm::Value* get_stringArray_length(ASR::ttype_t* type, llvm::Value* arr_ptr);
+            llvm::Value* get_stringArray_length(ASR::ttype_t* type, llvm::Value* arr_ptr, bool get_pointer_to_len=false);
 
             /*
                 Frees Strings.
