@@ -10,7 +10,9 @@
 namespace LCompilers {
 
 // hard code avoided types (handled by llvm backend) -- We're transitioing the deallocation process into the backend. 
-auto avoided_type = [](ASR::ttype_t* t) -> bool {return ASRUtils::extract_type(t)->type == ASR::String;};
+auto const avoided_type = [](ASR::ttype_t* const t) {
+                        return (ASRUtils::extract_type(t)->type == ASR::String)
+                            || (ASRUtils::type_get_past_allocatable_pointer(t)->type == ASR::Array); };
 
 class InsertDeallocate: public ASR::CallReplacerOnExpressionsVisitor<InsertDeallocate>
 {

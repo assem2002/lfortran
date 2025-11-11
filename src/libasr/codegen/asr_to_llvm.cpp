@@ -1271,7 +1271,7 @@ public:
         }
         LCOMPILERS_ASSERT_MSG(llvm_utils->stringFormat_return.all_clean(),
                         "`_lcompilers_string_format_fortran()` Return Not Freed");
-        LLVMFinalize(llvm_utils, builder, symbol_to_returnBlock).finalize_TranslationUnit(&x);
+        LLVMFinalize(llvm_utils, builder, symbol_to_returnBlock, al).finalize_TranslationUnit(&x);
     }
 
     template <typename T>

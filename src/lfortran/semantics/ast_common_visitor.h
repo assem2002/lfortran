@@ -4294,15 +4294,15 @@ public:
                                 } else {
                                     is_correct_type_implieddoloop = false;
                             }
-                            if ((!is_correct_type_func && !is_correct_type_implieddoloop) ||
-                                (func_call != nullptr && strcmp(func_call->m_func, sym_type->m_name) != 0)) {
-                                diag.add(Diagnostic(
-                                    "Array members must me of the same type as the struct",
-                                    Level::Error, Stage::Semantic, {
-                                        Label("",{array_init->m_args[0]->base.loc})
-                                    }));
-                                throw SemanticAbort();
-                            }
+                            // if ((!is_correct_type_func && !is_correct_type_implieddoloop) ||
+                            //     (func_call != nullptr && strcmp(func_call->m_func, sym_type->m_name) != 0)) {
+                            //     diag.add(Diagnostic(
+                            //         "Array members must me of the same type as the struct",
+                            //         Level::Error, Stage::Semantic, {
+                            //             Label("",{array_init->m_args[0]->base.loc})
+                            //         }));
+                            //     throw SemanticAbort();
+                            // }
                         }
 
                         visit_ArrayInitializer(*array_init);

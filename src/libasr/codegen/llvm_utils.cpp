@@ -1,8 +1,11 @@
 #include "libasr/asr.h"
+#include "libasr/assert.h"
 #include <libasr/codegen/llvm_utils.h>
 #include <libasr/codegen/llvm_array_utils.h>
 #include <libasr/asr_utils.h>
 #include <libasr/codegen/llvm_compat.h>
+#include <llvm/ADT/APInt.h>
+#include <llvm/IR/BasicBlock.h>
 #include <llvm/Support/raw_ostream.h>
 
 namespace LCompilers {
@@ -1006,6 +1009,57 @@ namespace LCompilers {
         return args;
     }
 
+
+    /**
+     * @param insert_loop_after_current_BB TRUE  = Insert the loop just after the current Basic Block,
+                                           FALSE = Insert after last BB in current function.
+     */
+    llvm::Value* LLVMUtils::get_array_size(llvm::Value* array_ptr, llvm::Type* array_llvm_type, ASR::ttype_t* array_asr_type, bool insert_loop_after_current_BB){
+        const int RESULT_KIND = 8;
+        if(ASRUtils::is_fixed_size_array(array_asr_type)){
+            const auto array_size = ASRUtils::get_fixed_size_of_array(array_asr_type);
+            return llvm::ConstantInt::get(context, llvm::APInt(RESULT_KIND * 8, array_size));
+        } else {
+            LCOMPILERS_ASSERT(ASR::down_cast<ASR::Array_t>(array_asr_type)->m_physical_type == ASR::DescriptorArray)
+            return arr_api->get_array_size(array_llvm_type, array_ptr, nullptr, RESULT_KIND);
+
+            llvm::Value* dim_des_val = arr_api->get_pointer_to_dimension_descriptor_array(array_llvm_type, array_ptr);
+            llvm::Value* tmp = nullptr;
+            llvm::Value* rank = arr_api->get_rank(array_llvm_type, array_ptr);
+            llvm::Value* llvm_size = CreateAlloca(getIntType(RESULT_KIND));
+            builder->CreateStore(llvm::ConstantInt::get(context, llvm::APInt(RESULT_KIND * 8, 1)), llvm_size);
+
+            llvm::BasicBlock *loophead = llvm::BasicBlock::Create(context, "loop.head");
+            llvm::BasicBlock *loopbody = llvm::BasicBlock::Create(context, "loop.body");
+            llvm::BasicBlock *loopend = llvm::BasicBlock::Create(context, "loop.end");
+
+            llvm::Value* r = CreateAlloca(getIntType(4));
+            builder->CreateStore(llvm::ConstantInt::get(context, llvm::APInt(32, 0)), r);
+            // head
+            insert_loop_after_current_BB ? start_new_block_after_current_BB(loophead) : start_new_block(loophead);
+            llvm::Value *cond = builder->CreateICmpSLT(CreateLoad2(getIntType(4), r), rank);
+            builder->CreateCondBr(cond, loopbody, loopend);
+
+            // body
+            insert_loop_after_current_BB ? start_new_block_after_current_BB(loopbody) : start_new_block(loopbody);
+            llvm::Value* r_val = CreateLoad2(getIntType(4), r);
+            llvm::Value* ret_val = CreateLoad2(getIntType(RESULT_KIND), llvm_size);
+            llvm::Value* dim_size = arr_api->get_dimension_size(dim_des_val, r_val);
+            dim_size = builder->CreateSExtOrTrunc(dim_size, getIntType(RESULT_KIND));
+            ret_val = builder->CreateMul(ret_val, dim_size);
+            builder->CreateStore(ret_val, llvm_size);
+            r_val = builder->CreateAdd(r_val, llvm::ConstantInt::get(context, llvm::APInt(32, 1)));
+            builder->CreateStore(r_val, r);
+            builder->CreateBr(loophead);
+
+            // end
+            insert_loop_after_current_BB ? start_new_block_after_current_BB(loopend) : start_new_block(loopend);
+
+            tmp = CreateLoad2(getIntType(RESULT_KIND), llvm_size);
+            return tmp;
+        }
+    }
+
     llvm::FunctionType* LLVMUtils::get_function_type(const ASR::Function_t &x, llvm::Module* module) {
         llvm::Type *return_type;
         if (x.m_return_var) {
@@ -1456,7 +1510,6 @@ namespace LCompilers {
         }
         return llvm_type;
     }
-
     llvm::Type* LLVMUtils::get_type_from_ttype_t_util(ASR::expr_t* expr, ASR::ttype_t* asr_type,
         llvm::Module* module, ASR::abiType asr_abi) {
         ASR::storage_typeType m_storage_local = ASR::storage_typeType::Default;
@@ -1702,6 +1755,14 @@ namespace LCompilers {
             }
         }
         return type_ptr;
+    }
+    void LLVMUtils::start_new_block_after_current_BB(llvm::BasicBlock *bb){
+        // llvm::BasicBlock *current_BB = builder->GetInsertBlock();
+        // llvm::Instruction *block_terminator = current_BB->getTerminator();
+        // if (block_terminator == nullptr) { builder->CreateBr(bb); }
+        // builder->GetInsertPoint()
+        // bb->insertInto(current_BB->getParent(), );
+        start_new_block(bb);
     }
 
     void LLVMUtils::start_new_block(llvm::BasicBlock *bb) {
