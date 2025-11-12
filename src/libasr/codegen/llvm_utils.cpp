@@ -1,8 +1,12 @@
 #include "libasr/asr.h"
+#include "libasr/assert.h"
+#include <cstddef>
 #include <libasr/codegen/llvm_utils.h>
 #include <libasr/codegen/llvm_array_utils.h>
 #include <libasr/asr_utils.h>
 #include <libasr/codegen/llvm_compat.h>
+#include <llvm/ADT/APInt.h>
+#include <llvm/IR/BasicBlock.h>
 #include <llvm/Support/raw_ostream.h>
 
 namespace LCompilers {
@@ -1006,6 +1010,7 @@ namespace LCompilers {
         return args;
     }
 
+
     llvm::FunctionType* LLVMUtils::get_function_type(const ASR::Function_t &x, llvm::Module* module) {
         llvm::Type *return_type;
         if (x.m_return_var) {
@@ -1456,7 +1461,6 @@ namespace LCompilers {
         }
         return llvm_type;
     }
-
     llvm::Type* LLVMUtils::get_type_from_ttype_t_util(ASR::expr_t* expr, ASR::ttype_t* asr_type,
         llvm::Module* module, ASR::abiType asr_abi) {
         ASR::storage_typeType m_storage_local = ASR::storage_typeType::Default;
@@ -1702,6 +1706,14 @@ namespace LCompilers {
             }
         }
         return type_ptr;
+    }
+    void LLVMUtils::start_new_block_after_current_BB(llvm::BasicBlock *bb){
+        // llvm::BasicBlock *current_BB = builder->GetInsertBlock();
+        // llvm::Instruction *block_terminator = current_BB->getTerminator();
+        // if (block_terminator == nullptr) { builder->CreateBr(bb); }
+        // builder->GetInsertPoint()
+        // bb->insertInto(current_BB->getParent(), );
+        start_new_block(bb);
     }
 
     void LLVMUtils::start_new_block(llvm::BasicBlock *bb) {
