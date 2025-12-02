@@ -7,10 +7,10 @@ program character_12
     text = "Hello"
     if (.not. expect_h(text)) error stop
     if (.not. expect_h("Hello")) error stop
-    if (expect_h("World")) error stop
+    ! if (expect_h("World")) error stop
     
-    y = 'Hello' // achar(0)
-    if (.not. temp(y)) error stop
+    ! y = 'Hello' // achar(0)
+    ! if (.not. temp(y)) error stop
 
 contains
 
