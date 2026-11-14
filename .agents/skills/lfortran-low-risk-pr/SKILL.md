@@ -13,7 +13,7 @@ A low-risk PR does not wait for the user: it is marked ready for review, gets th
 
 ## When to run it
 
-Every time a PR to `lfortran/lfortran` is created or gets a new push. A `PostToolUse` hook in `~/.claude/settings.json` reminds you after `gh pr create`, `publish_pr.sh` and `git push`. Run it for PRs that agents open too; in the batch-fix workflow the coordinator does it when an agent reports its PR.
+Every time a PR to `lfortran/lfortran` is created or gets a new push. A `PostToolUse` hook, `hooks/low_risk_pr_reminder.py` in this skill's folder, reminds you after `gh pr create`, `publish_pr.sh` and `git push`. It is turned on in `~/.claude/settings.json` under `hooks.PostToolUse`, with matcher `Bash` and command `/usr/bin/python3 <skill>/hooks/low_risk_pr_reminder.py 2>/dev/null || true`. Run it for PRs that agents open too; in the batch-fix workflow the coordinator does it when an agent reports its PR.
 
 ## How to judge a PR
 
