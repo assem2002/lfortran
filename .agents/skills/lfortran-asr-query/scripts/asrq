@@ -1,0 +1,641 @@
+#!/usr/bin/env python3
+"""asrq: query LFortran's ASR (via --show-asr --json) and print short, labelled output.
+
+usage: asrq [-p PASS] [-a] [-k DIR] COMMAND [ARG] SOURCE [-- LFORTRAN_FLAGS...]
+
+SOURCE is a Fortran file, or a .json file saved earlier with `asrq dump`.
+The compiler is $LFORTRAN, else ./src/bin/lfortran, else ./build/src/bin/lfortran,
+else lfortran on PATH. Symbol references print as name@scope (e.g. a@m::f).
+
+commands:
+  scopes             every scope (symbol table) and the symbols it holds, by kind
+  sym NAME           each symbol NAME (or m::f): its scope, attributes, locals, body
+  find REGEX         one line per node whose kind fully matches REGEX ('Cast', '.*Call')
+  tree REGEX         like find, but print each match as an outline
+  line N             outline of the nodes that start on source line N
+  resolve REF        follow ExternalSymbol links from REF (f@p, f@6 or 'f (SymbolTable6)')
+  count              number of nodes of each kind
+  outline            the whole ASR as an outline (no locations)
+  diff OLD           unified diff of the outlines of OLD and SOURCE (add -a to compare
+                     the hidden default-valued fields too)
+  passes             run --dump-all-passes and show what each pass changed
+  dump               print the ASR JSON (with locations), e.g. to save for diff
+
+options:
+  -p PASS   use the ASR after PASS of the default pipeline (its first run, or the
+            NN number that `passes` prints)
+  -a        show every field (by default false, empty and default values are hidden)
+  -k DIR    keep the per-pass JSON dumps in DIR (new or empty), for `passes` and -p
+"""
+
+import difflib
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from collections import Counter
+
+sys.setrecursionlimit(20000)
+
+TYPES = {
+    "Integer", "UnsignedInteger", "Real", "Complex", "String", "Logical", "Set",
+    "List", "Tuple", "StructType", "EnumType", "UnionType", "Dict", "Pointer",
+    "Allocatable", "CPtr", "SymbolicExpression", "TypeParameter", "Array",
+    "FunctionType",
+}
+DEFAULTS = {
+    "access": "Public", "presence": "Required", "abi": "Source",
+    "storage": "Default", "pass_attr": "NotMethod", "intboz_type": "Decimal",
+    "memory_space": "Global", "deftype": "Implementation", "exec_space": "Host",
+}
+NOISY = {"dependencies", "parent_symtab", "struct_signature"}
+# ASR field holding an intrinsic id -> (header under src/libasr/pass, C++ enum)
+INTRINSIC_ENUMS = {
+    "intrinsic_id": ("intrinsic_functions.h", "IntrinsicElementalFunctions"),
+    "arr_intrinsic_id": ("intrinsic_array_function_registry.h", "IntrinsicArrayFunctions"),
+    "impure_intrinsic_id": ("intrinsic_function_registry.h", "IntrinsicImpureFunctions"),
+    "sub_intrinsic_id": ("intrinsic_subroutines.h", "IntrinsicImpureSubroutines"),
+}
+SRC_ROOTS = []  # LFortran source trees to read the intrinsic enums from
+_enum_cache = {}
+REF_RAW = re.compile(r"^(.*) \(SymbolTable(\d+)\)$")
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def die(msg):
+    sys.stderr.write("asrq: " + msg + "\n")
+    sys.exit(1)
+
+
+def is_node(x):
+    return isinstance(x, dict) and "node" in x and "fields" in x
+
+
+def is_type(x):
+    return is_node(x) and x["node"] in TYPES
+
+
+def node_children(x):
+    """(key, value) pairs of a node's fields that hold nodes or lists of nodes."""
+    for k, v in x["fields"].items():
+        if is_node(v) or (isinstance(v, list) and any(is_node(e) for e in v)):
+            yield k, v
+
+
+def walk(x, path=()):
+    """Yield (path, node) for x and every node below it, in document order."""
+    if is_node(x):
+        yield path, x
+        for k, v in x["fields"].items():
+            yield from walk(v, path + ("fields", k))
+    elif isinstance(x, list):
+        for i, e in enumerate(x):
+            yield from walk(e, path + (i,))
+
+
+def scope_names(path):
+    """Names of the symbols a path passes through: the key after each symtab.fields."""
+    return [path[i + 2] for i in range(len(path) - 2)
+            if path[i] == "symtab" and path[i + 1] == "fields"]
+
+
+class ASR:
+    def __init__(self, root, show_all=False, loc=True):
+        self.root = root
+        self.show_all = show_all
+        self.loc = loc
+        self.tables = {}  # symtab id -> (qualified scope name, {symbol name: node})
+        for path, n in walk(root):
+            st = n["fields"].get("symtab")
+            if is_node(st) and st["node"].startswith("SymbolTable"):
+                tid = st["node"][len("SymbolTable"):]
+                self.tables[tid] = ("::".join(scope_names(path)), st["fields"])
+
+    # ---- references -------------------------------------------------------
+    def scope_label(self, tid):
+        if tid not in self.tables:
+            return tid
+        return self.tables[tid][0] or "tu"
+
+    def ref(self, v):
+        if isinstance(v, str):
+            m = REF_RAW.match(v)
+            if m:
+                return "%s@%s" % (m[1], self.scope_label(m[2]))
+        return v
+
+    def parse_ref(self, s):
+        m = REF_RAW.match(s)
+        if m:
+            return m[1], m[2]
+        if "@" in s:
+            name, scope = s.rsplit("@", 1)
+            if scope in self.tables:
+                return name, scope
+            for tid, (q, _) in self.tables.items():
+                if (q or "tu") == scope:
+                    return name, tid
+        die("cannot parse reference %r (use f@scope, f@6 or 'f (SymbolTable6)')" % s)
+
+    def resolve_chain(self, name, tid):
+        """[(qualified name, kind)] following ExternalSymbol links."""
+        chain = []
+        for _ in range(50):
+            scope, syms = self.tables.get(tid, ("?", {}))
+            s = syms.get(name)
+            q = (scope + "::" if scope else "") + name
+            if s is None:
+                chain.append((q, "missing"))
+                break
+            chain.append((q, s["node"]))
+            if s["node"] != "ExternalSymbol":
+                break
+            m = REF_RAW.match(s["fields"]["external"])
+            if not m:
+                break
+            name, tid = m[1], m[2]
+        return chain
+
+    def resolve_str(self, raw):
+        m = REF_RAW.match(raw) if isinstance(raw, str) else None
+        if not m:
+            return None
+        q, kind = self.resolve_chain(m[1], m[2])[-1]
+        return "%s (%s)" % (q, kind)
+
+    # ---- rendering --------------------------------------------------------
+    def brief(self, x):
+        if not is_node(x):
+            return "-" if x == [] else str(x)
+        f, k = x["fields"], x["node"]
+        if k == "Var":
+            return self.ref(f["v"])
+        if k == "call_arg":
+            return self.brief(f["value"]) if is_node(f["value"]) else "(absent)"
+        if k == "IntegerConstant":
+            return str(f["n"])
+        if k == "RealConstant":
+            return str(f["r"])
+        if k == "LogicalConstant":
+            return ".%s." % str(f["value"]).lower()
+        if k == "StringConstant":
+            return json.dumps(f["s"])
+        if k == "StructInstanceMember":
+            return "%s%%%s" % (self.brief(f["v"]), self.ref(f["m"]).split("@")[0])
+        if k in ("ArrayItem", "ArraySection"):
+            return "%s(%s)" % (self.brief(f["v"]), k)
+        if k == "Cast":
+            return "Cast[%s](%s)" % (f["kind"], self.brief(f["arg"]))
+        if k in ("FunctionCall", "SubroutineCall"):
+            return "%s(...)" % self.ref(f["name"])
+        return k
+
+    def dim(self, d):
+        f = d["fields"]
+        s, n = f.get("start"), f.get("length")
+        if not is_node(s) and not is_node(n):
+            return ":"
+        if not is_node(n):
+            return self.brief(s) + ":"
+        if is_node(s) and s["node"] == n["node"] == "IntegerConstant":
+            return "%d:%d" % (s["fields"]["n"], s["fields"]["n"] + n["fields"]["n"] - 1)
+        return "%s:+%s" % (self.brief(s), self.brief(n))
+
+    def ty(self, t, decl=None):
+        if not is_node(t):
+            return str(t)
+        f, k = t["fields"], t["node"]
+        if k in ("Integer", "UnsignedInteger", "Real", "Complex", "Logical"):
+            return "%s(%s)" % (k.lower(), f["kind"])
+        if k == "String":
+            if is_node(f.get("len")):
+                ln = self.brief(f["len"])
+            else:
+                ln = "*" if f.get("len_kind") == "AssumedLength" else ":"
+            return "character(%s)" % ln
+        if k == "Array":
+            pt = f.get("physical_type", "DescriptorArray")
+            s = "%s[%s]" % (self.ty(f["type"], decl), ",".join(self.dim(d) for d in f["dims"]))
+            return s if pt == "DescriptorArray" else s + " " + pt
+        if k in ("Allocatable", "Pointer"):
+            return "%s %s" % (k.lower(), self.ty(f["type"], decl))
+        if k == "StructType":
+            if f.get("is_unlimited_polymorphic"):
+                return "class(*)"
+            return "type(%s)" % (decl or "..")
+        if k == "FunctionType":
+            if decl:
+                return "procedure(%s)" % decl
+            s = "procedure(%s)" % ", ".join(self.ty(a) for a in f["arg_types"])
+            if is_node(f.get("return_var_type")):
+                s += " -> " + self.ty(f["return_var_type"])
+            return s
+        return k
+
+    def head(self, x, loc=None):
+        f = x["fields"]
+        decl = self.ref(f.get("type_declaration")) if isinstance(f.get("type_declaration"), str) else None
+        tytext = self.ty(f["type"], decl) if is_type(f.get("type")) else None
+        parts = [x["node"]]
+        for k, v in f.items():
+            if k in ("type", "symtab") or (is_node(v) and not is_type(v)):
+                continue
+            if isinstance(v, list) and any(is_node(e) and not is_type(e) for e in v):
+                continue
+            if not self.show_all:
+                if v is False or v is None or v == [] or v == "" or DEFAULTS.get(k) == v or k in NOISY:
+                    continue
+                if k == "type_declaration" and tytext and decl in tytext:
+                    continue
+            if is_type(v):
+                v = self.ty(v)
+            elif isinstance(v, list):
+                v = "[%s]" % ",".join(self.ty(e) if is_type(e) else str(self.ref(e)) for e in v)
+            elif isinstance(v, str) and v.startswith("Unimplemented"):
+                v = "(not in JSON)"
+            elif k in INTRINSIC_ENUMS and isinstance(v, int):
+                names = intrinsic_names(k)
+                v = "%d(%s)" % (v, names[v]) if v < len(names) else v
+            else:
+                v = self.ref(v)
+            parts.append("%s=%s" % (k, v))
+        s = " ".join(parts)
+        if tytext:
+            s += " : " + tytext
+        if (self.loc if loc is None else loc) and x.get("loc"):
+            s += "  @%d:%d" % (x["loc"]["first_line"], x["loc"]["first_column"])
+        return s
+
+    def outline(self, x, out, ind="", label=""):
+        if x["node"] == "call_arg":
+            if is_node(x["fields"]["value"]):
+                self.outline(x["fields"]["value"], out, ind, label)
+            else:
+                out.append(ind + label + "(absent)")
+            return
+        line = ind + label + self.head(x)
+        if x["node"] in ("FunctionCall", "SubroutineCall"):
+            r = self.resolve_str(x["fields"]["name"])
+            if r:
+                line += "  => " + r
+        out.append(line)
+        st = x["fields"].get("symtab")
+        if is_node(st):
+            for s in st["fields"].values():
+                self.outline(s, out, ind + "  ")
+        for k, v in node_children(x):
+            if k == "symtab":
+                continue
+            for e in (v if isinstance(v, list) else [v]):
+                if is_node(e) and not is_type(e):
+                    self.outline(e, out, ind + "  ", k + ": ")
+
+    def one_line(self, path, x):
+        parts = [self.head(x, loc=False)]
+        for k, v in node_children(x):
+            if k == "symtab" or is_type(v) or (isinstance(v, list) and all(is_type(e) for e in v)):
+                continue
+            if isinstance(v, list):
+                parts.append("%s=[%s]" % (k, ", ".join(self.brief(e) for e in v)))
+            else:
+                parts.append("%s=%s" % (k, self.brief(v)))
+        for key in ("name", "v", "external"):
+            r = self.resolve_str(x["fields"].get(key))
+            if r and x["node"] not in ("Variable", "Function", "Program", "Module"):
+                parts.append("=> " + r)
+                break
+        s = "%s: %s" % (self.where(path, x), " ".join(parts))
+        return s if len(s) <= 400 else s[:400] + " ..."
+
+    def where(self, path, x):
+        lc = x.get("loc")
+        return "%s %s" % ("::".join(scope_names(path)) or "tu",
+                          "L%d:%d" % (lc["first_line"], lc["first_column"]) if lc else "L-")
+
+
+def intrinsic_names(field):
+    """Enumerator names of the C++ enum behind an intrinsic id field, in order."""
+    if field not in _enum_cache:
+        header, enum = INTRINSIC_ENUMS[field]
+        names = []
+        for root in SRC_ROOTS:
+            path = os.path.join(root, "src", "libasr", "pass", header)
+            if os.path.isfile(path):
+                with open(path) as fh:
+                    m = re.search(r"enum class %s\b[^{]*\{(.*?)\};" % enum, fh.read(), re.S)
+                if m:
+                    body = re.sub(r"//[^\n]*|/\*.*?\*/", "", m[1], flags=re.S)
+                    names = [e.split("=")[0].strip() for e in body.split(",") if e.strip()]
+                    break
+        _enum_cache[field] = names
+    return _enum_cache[field]
+
+
+def add_src_root(start, first=False):
+    """Record the LFortran source tree containing start (the compiler's own tree goes first)."""
+    d = os.path.abspath(start)
+    while True:
+        if os.path.isfile(os.path.join(d, "src", "libasr", "ASR.asdl")):
+            if d in SRC_ROOTS:
+                SRC_ROOTS.remove(d)
+            SRC_ROOTS.insert(0 if first else len(SRC_ROOTS), d)
+            return
+        parent = os.path.dirname(d)
+        if parent == d:
+            return
+        d = parent
+
+
+# ---- running lfortran -----------------------------------------------------
+def find_lfortran():
+    for c in (os.environ.get("LFORTRAN"), "./src/bin/lfortran", "./build/src/bin/lfortran"):
+        if c and os.path.isfile(c) and os.access(c, os.X_OK):
+            return os.path.abspath(c)
+    c = shutil.which("lfortran")
+    if not c:
+        die("no lfortran found: set $LFORTRAN or run from a build tree")
+    return c
+
+
+def run_lf(lf, argv, cwd=None):
+    p = subprocess.run([lf] + argv, cwd=cwd, capture_output=True, text=True)
+    if p.returncode != 0:
+        sys.stderr.write(ANSI.sub("", p.stderr + p.stdout))
+        die("lfortran exited with %d" % p.returncode)
+    if p.stderr.strip():
+        sys.stderr.write(ANSI.sub("", p.stderr))
+    return p.stdout
+
+
+def strip_loc(x):
+    if isinstance(x, dict):
+        return {k: strip_loc(v) for k, v in x.items() if k != "loc"}
+    if isinstance(x, list):
+        return [strip_loc(e) for e in x]
+    return x
+
+
+def count(root):
+    return Counter(n["node"] for _, n in walk(root) if not n["node"].startswith("SymbolTable"))
+
+
+class Session:
+    def __init__(self, opts, extra):
+        self.opts, self.extra = opts, extra
+        self.lf = None
+        self.tmp = None
+        self.kept = None
+
+    def lfortran(self):
+        if not self.lf:
+            self.lf = find_lfortran()
+            add_src_root(os.path.dirname(os.path.realpath(self.lf)), first=True)
+            sys.stderr.write("asrq: lfortran = %s\n" % self.lf)
+        return self.lf
+
+    def pass_dir(self):
+        if self.opts["keep"] and not self.kept:
+            d = self.kept = self.opts["keep"]
+            if os.path.exists(d) and os.listdir(d):
+                die("-k %s: directory exists and is not empty" % d)
+            os.makedirs(d, exist_ok=True)
+            return d
+        self.tmp = self.tmp or tempfile.mkdtemp(prefix="asrq.")
+        return tempfile.mkdtemp(dir=self.tmp)
+
+    def dump_passes(self, src):
+        """Write pass_json_00_initial.json plus one JSON per pass; return (dir, files, failure)."""
+        d, lf, src = self.pass_dir(), self.lfortran(), os.path.abspath(src)
+        with open(os.path.join(d, "pass_json_00_initial.json"), "w") as fh:
+            fh.write(run_lf(lf, ["--show-asr", "--json", src] + self.extra))
+        p = subprocess.run([lf, "--dump-all-passes", "--json", "--show-asr", src] + self.extra,
+                           cwd=d, capture_output=True, text=True)
+        for f in os.listdir(d):
+            if not (f.startswith("pass_json_") and f.endswith(".json")):
+                os.remove(os.path.join(d, f))
+        files = sorted(f for f in os.listdir(d) if f.startswith("pass_json_"))
+        failure = None
+        if p.returncode != 0:
+            failure = (p.returncode, ANSI.sub("", p.stderr + p.stdout))
+        return d, files, failure
+
+    def load(self, src):
+        if src.endswith(".json"):
+            if self.opts["pass"]:
+                die("-p needs a Fortran source, not %s" % src)
+            with open(src) as fh:
+                return json.load(fh)
+        if not os.path.isfile(src):
+            die("no such file: %s" % src)
+        if not self.opts["pass"]:
+            return json.loads(run_lf(self.lfortran(), ["--show-asr", "--json", src] + self.extra))
+        d, files, failure = self.dump_passes(src)
+        want = self.opts["pass"]
+        for f in files:
+            m = re.match(r"pass_json_(\d+)_(.*)\.json$", f)
+            if (want.isdigit() and int(m[1]) == int(want)) or m[2] == want:
+                sys.stderr.write("asrq: ASR after %s\n" % f)
+                with open(os.path.join(d, f)) as fh:
+                    return json.load(fh)
+        if failure:
+            sys.stderr.write(tail(failure[1]))
+        die("no dump for pass %r; available: %s" % (want, " ".join(
+            re.sub(r"^pass_json_|\.json$", "", f) for f in files)))
+
+    def cleanup(self):
+        if self.tmp:
+            shutil.rmtree(self.tmp, ignore_errors=True)
+
+
+def tail(text, n=15):
+    lines = text.rstrip().splitlines()
+    return "\n".join(lines[-n:]) + "\n"
+
+
+def delta(a, b, limit=12):
+    d = [(k, b[k] - a[k]) for k in set(a) | set(b) if b[k] != a[k]]
+    d.sort(key=lambda kv: (-abs(kv[1]), kv[0]))
+    s = ", ".join("%+d %s" % (n, k) for k, n in d[:limit])
+    return s + (", ... %d more kinds" % (len(d) - limit) if len(d) > limit else "")
+
+
+def cmd_passes(sess, src):
+    d, files, failure = sess.dump_passes(src)
+    prev_count = prev_sig = None
+    unchanged = []
+    for f in files:
+        m = re.match(r"pass_json_(\d+)_(.*)\.json$", f)
+        with open(os.path.join(d, f)) as fh:
+            root = json.load(fh)
+        c = count(root)
+        sig = hashlib.sha1(json.dumps(strip_loc(root), sort_keys=True).encode()).hexdigest()
+        if prev_count is None:
+            print("%s %-28s %d nodes" % (m[1], m[2], sum(c.values())))
+        elif sig == prev_sig:
+            unchanged.append(m[1] + " " + m[2])
+        else:
+            print("%s %-28s %s" % (m[1], m[2], delta(prev_count, c) or "fields changed, same node counts"))
+        prev_count, prev_sig = c, sig
+    if unchanged:
+        print("unchanged: " + ", ".join(unchanged))
+    if failure:
+        print("\nlfortran exited with %d after the last dump above; end of its output:" % failure[0])
+        sys.stdout.write(tail(failure[1]))
+    if sess.opts["keep"]:
+        print("\ndumps kept in %s; query one with: asrq find REGEX %s/%s" % (d, d, files[-1]))
+
+
+def source_line(src, root, n):
+    path = src if not src.endswith(".json") else None
+    if path is None:
+        for _, x in walk(root):
+            if x.get("loc"):
+                path = x["loc"].get("first_filename")
+                break
+    try:
+        with open(path) as fh:
+            return fh.read().splitlines()[n - 1].strip()
+    except (OSError, IndexError, TypeError):
+        return None
+
+
+def main():
+    argv = sys.argv[1:]
+    extra = []
+    if "--" in argv:
+        i = argv.index("--")
+        argv, extra = argv[:i], argv[i + 1:]
+    opts = {"pass": None, "all": False, "keep": None}
+    pos = []
+    it = iter(argv)
+    for a in it:
+        if a in ("-h", "--help"):
+            print(__doc__)
+            return
+        if a == "-p":
+            opts["pass"] = next(it, None) or die("-p needs a pass")
+        elif a == "-a":
+            opts["all"] = True
+        elif a == "-k":
+            opts["keep"] = next(it, None) or die("-k needs a directory")
+        else:
+            pos.append(a)
+    takes_arg = {"sym", "find", "tree", "line", "resolve", "diff"}
+    no_arg = {"scopes", "count", "outline", "passes", "dump"}
+    if not pos or pos[0] not in takes_arg | no_arg:
+        print(__doc__)
+        sys.exit(1)
+    cmd = pos[0]
+    want = 3 if cmd in takes_arg else 2
+    if len(pos) != want:
+        die("usage: asrq %s %sSOURCE (see asrq -h)" % (cmd, "ARG " if cmd in takes_arg else ""))
+    arg, src = (pos[1], pos[2]) if want == 3 else (None, pos[1])
+
+    sess = Session(opts, extra)
+    add_src_root(os.getcwd())
+    try:
+        if cmd == "passes":
+            if src.endswith(".json"):
+                die("passes needs a Fortran source")
+            cmd_passes(sess, src)
+            return
+        if cmd == "dump":
+            json.dump(sess.load(src), sys.stdout, indent=1)
+            print()
+            return
+        root = sess.load(src)
+        if cmd == "diff":
+            old = sess.load(arg)
+            out = []
+            for r in (old, root):
+                lines = []
+                ASR(r, show_all=opts["all"], loc=False).outline(r, lines)
+                out.append(lines)
+            d = list(difflib.unified_diff(out[0], out[1], arg, src, lineterm="", n=3))
+            print("\n".join(d) if d else "no difference")
+            return
+        asr = ASR(root, show_all=opts["all"], loc=cmd != "outline")
+        if cmd == "scopes":
+            for path, n in walk(root):
+                st = n["fields"].get("symtab")
+                if not is_node(st):
+                    continue
+                groups = {}
+                for name, s in st["fields"].items():
+                    groups.setdefault(s["node"], []).append(name)
+                depth = len(scope_names(path))
+                print("%s%s %s #%s: %s" % (
+                    "  " * depth, n["node"], n["fields"].get("name") or "",
+                    st["node"][len("SymbolTable"):],
+                    "; ".join("%s: %s" % (k, ", ".join(v)) for k, v in groups.items())))
+        elif cmd == "sym":
+            hits = 0
+            for tid, (scope, syms) in asr.tables.items():
+                for name, s in syms.items():
+                    q = (scope + "::" if scope else "") + name
+                    if (q == arg or q.endswith("::" + arg)) if "::" in arg else name == arg:
+                        hits += 1
+                        hdr = "== %s  (in %s, #%s)" % (q, scope or "tu", tid)
+                        if s["node"] == "ExternalSymbol":
+                            chain = asr.resolve_chain(name, tid)
+                            hdr += "  => " + " => ".join("%s (%s)" % c for c in chain[1:])
+                        print(hdr)
+                        out = []
+                        asr.outline(s, out)
+                        print("\n".join(out))
+            if not hits:
+                die("no symbol named %s" % arg)
+        elif cmd in ("find", "tree"):
+            rx = re.compile(arg)
+            hits = 0
+            for path, n in walk(root):
+                if rx.fullmatch(n["node"]):
+                    hits += 1
+                    if cmd == "find":
+                        print(asr.one_line(path, n))
+                    else:
+                        print("== " + asr.where(path, n))
+                        out = []
+                        asr.outline(n, out)
+                        print("\n".join(out))
+            if not hits:
+                print("no %s nodes" % arg)
+        elif cmd == "line":
+            n = int(arg)
+            text = source_line(src, root, n)
+            if text is not None:
+                print("L%d: %s" % (n, text))
+            hits = [(p, x) for p, x in walk(root)
+                    if x.get("loc", {}).get("first_line") == n]
+            paths = [p for p, _ in hits]
+            for p, x in hits:
+                if any(len(q) < len(p) and p[:len(q)] == q for q in paths):
+                    continue
+                print("== %s" % ("::".join(scope_names(p)) or "tu"))
+                out = []
+                asr.outline(x, out)
+                print("\n".join(out))
+            if not hits:
+                print("no node starts on line %d (try --show-asr without -p, or a nearby line)" % n)
+        elif cmd == "resolve":
+            name, tid = asr.parse_ref(arg)
+            print(" => ".join("%s (%s)" % c for c in asr.resolve_chain(name, tid)))
+        elif cmd == "count":
+            for k, v in sorted(count(root).items(), key=lambda kv: (-kv[1], kv[0])):
+                print("%5d %s" % (v, k))
+        elif cmd == "outline":
+            out = []
+            asr.outline(root, out)
+            print("\n".join(out))
+    except BrokenPipeError:
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+    finally:
+        sess.cleanup()
+
+
+if __name__ == "__main__":
+    main()
