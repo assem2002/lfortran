@@ -23,18 +23,11 @@
 # Exit codes: 3 if the slot is not open yet, 4 if the build failed,
 # otherwise the command's exit code.
 #
-# Environment overrides:
-#   BATCH_FIX_STATE  state dir (default ~/lfortran_test/.batch-fix)
-#   BATCH_FIX_WORK   the partition for builds and worktrees (default /media/assem/nvme-9gb)
-#   BATCH_FIX_BUILD  shared build worktree (default $BATCH_FIX_WORK/lfortran-fixes)
-#   BATCH_FIX_BUILD_JOBS  ninja jobs (default 8)
+# Paths and job counts come from _lib.sh. Also read from the environment:
 #   BATCH_FIX_CWD    directory to run the command in (default: the build worktree)
 #   BATCH_FIX_LABEL  short text shown by slot_status.sh instead of the command
 
-STATE=${BATCH_FIX_STATE:-$HOME/lfortran_test/.batch-fix}
-WORK=${BATCH_FIX_WORK:-/media/assem/nvme-9gb}
-BUILD=${BATCH_FIX_BUILD:-$WORK/lfortran-fixes}
-JOBS=${BATCH_FIX_BUILD_JOBS:-8}
+. "$(dirname "$(readlink -f "$0")")/_lib.sh"
 LOCK=$STATE/build.lock
 OPEN=$STATE/build_slot.open
 QUEUE=$STATE/queue
@@ -112,7 +105,7 @@ fi
 echo "[build_slot] building $name at $(git rev-parse --short HEAD) + uncommitted changes" >&2
 # gcc writes its temporary files to TMPDIR; keep them off /.
 mkdir -p "$WORK/tmp"
-if ! TMPDIR=$WORK/tmp ninja -j"$JOBS" > "$log" 2>&1; then
+if ! TMPDIR=$WORK/tmp ninja -j"$BUILD_JOBS" > "$log" 2>&1; then
     echo "[build_slot] BUILD FAILED, see $log; last lines:" >&2
     grep -E "error|FAILED" "$log" | head -20 >&2
     log_event "build FAILED after $(($(date +%s) - started))s"

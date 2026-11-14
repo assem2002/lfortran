@@ -10,7 +10,7 @@ default format, 7k with `--clojure` and 12k as JSON. Don't read it whole. Ask
 the question you have with `asrq`, and read whole trees only for small pieces.
 
 ```bash
-ASRQ=~/.claude/skills/lfortran-asr-query/scripts/asrq
+ASRQ=<skill>/scripts/asrq      # <skill> is this skill's folder
 $ASRQ -h
 ```
 

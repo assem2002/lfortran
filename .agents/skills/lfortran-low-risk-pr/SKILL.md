@@ -25,7 +25,7 @@ Every time a PR to `lfortran/lfortran` is created or gets a new push. A `PostToo
 2. If it changes compiler code, read that code on upstream `main` around the change: what uses the changed table, and whether the new case really goes through code that already works for its neighbors.
 3. Decide: do ALL the changes fit ONE kind below? When in doubt, it is not low risk.
 4. Act:
-   - **Low risk:** `~/.claude/skills/lfortran-low-risk-pr/scripts/mark_low_risk.sh <PR> <kind> "<one-line reason>"`. It adds the label, writes the PR to the register, marks a draft ready and turns on auto-merge (merge commit). On a merged or closed PR it only adds the label.
+   - **Low risk:** `<skill>/scripts/mark_low_risk.sh <PR> <kind> "<one-line reason>"` (`<skill>` is this skill's folder). It adds the label, writes the PR to the register, marks a draft ready and turns on auto-merge (merge commit). On a merged or closed PR it only adds the label.
    - **Has the label but no longer low risk** (a later push added other changes): `mark_low_risk.sh <PR> --unmark`, and tell the user.
    - **Not low risk:** do nothing. The PR stays a draft for the user.
 5. In your report, say which PRs you found low risk, why in one line, and what was done.
@@ -96,7 +96,7 @@ Before a `register_entry` PR is pushed: the new test fails on main and passes on
 
 ## The low-risk register
 
-`low_risk_prs.txt` in this skill's folder lists every PR that got the `low risk` label, one per line: `<PR> <date> <kind> <title> | <reason>`. `mark_low_risk.sh` adds the line when it adds the label, and removes it with `--unmark`. A PR already in the file can be marked again (new push) without being listed twice. There is no limit on how many PRs it holds (the user removed the limit of 10 on 2026-11-12).
+`low_risk_prs.txt` in the batch-fix state directory (`~/lfortran_test/.batch-fix/`, or `$BATCH_FIX_STATE`) lists every PR that got the `low risk` label, one per line: `<PR> <date> <kind> <title> | <reason>`. `mark_low_risk.sh` adds the line when it adds the label, and removes it with `--unmark`. A PR already in the file can be marked again (new push) without being listed twice. There is no limit on how many PRs it holds (the user removed the limit of 10 on 2026-11-12).
 
 ## Adding a kind
 

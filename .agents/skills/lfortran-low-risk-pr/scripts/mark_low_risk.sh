@@ -5,7 +5,7 @@
 # Usage:
 #   mark_low_risk.sh <PR> <kind> "<one-line reason>"
 #       The PR is low risk: add the "low risk" label, write it to
-#       ../low_risk_prs.txt, mark a draft ready and turn on auto-merge.
+#       the register (see below), mark a draft ready and turn on auto-merge.
 #   mark_low_risk.sh <PR> --unmark
 #       The PR had the label but is no longer low risk: remove the label,
 #       turn auto-merge off and remove it from the register.
@@ -15,8 +15,9 @@ repo=lfortran/lfortran
 label="low risk"
 pr=${1:?usage: mark_low_risk.sh <PR> <kind> \"<reason>\" | mark_low_risk.sh <PR> --unmark}
 kind=${2:?usage: mark_low_risk.sh <PR> <kind> \"<reason>\" | mark_low_risk.sh <PR> --unmark}
-here=$(dirname "$(readlink -f "$0")")
-registry=$(dirname "$here")/low_risk_prs.txt
+# The register is state, so it lives with the batch-fix state, not in the skill.
+registry=${BATCH_FIX_STATE:-$HOME/lfortran_test/.batch-fix}/low_risk_prs.txt
+mkdir -p "$(dirname "$registry")"
 touch "$registry"
 
 if [ "$kind" = --unmark ]; then

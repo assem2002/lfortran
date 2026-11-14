@@ -19,17 +19,12 @@
 # Test tasks are pinned to 8 cores and get -j8 unless a smaller -j is given.
 # Called from inside a slot command, it runs at once without queueing again.
 #
-# Environment overrides: BATCH_FIX_STATE, BATCH_FIX_WORK, BATCH_FIX_BUILD, BATCH_FIX_MAIN, BATCH_FIX_JOBS.
+# Paths and job counts come from _lib.sh.
 # BATCH_FIX_DRY=1 prints the command that would run and exits.
 
-WORK=${BATCH_FIX_WORK:-/media/assem/nvme-9gb}
-BUILD=${BATCH_FIX_BUILD:-$WORK/lfortran-fixes}
-MAIN=${BATCH_FIX_MAIN:-$HOME/lfortran_test/lfortran}
-JOBS=${BATCH_FIX_JOBS:-8}
 here=$(dirname "$(readlink -f "$0")")
-# The slot was configured inside the conda env lf; its suites need that python, cmake and ctest.
-LF_ENV=${BATCH_FIX_CONDA_ENV:-$HOME/conda_root/envs/lf}
-case ":$PATH:" in *":$LF_ENV/bin:"*) ;; *) export PATH=$LF_ENV/bin:$PATH CONDA_PREFIX=$LF_ENV ;; esac
+# The slot was configured inside the conda env lf; _lib.sh puts its python, cmake and ctest first on PATH.
+. "$here/_lib.sh"
 
 [ "${1:-}" = run ] && shift
 if [ "${1:-}" = -e ]; then

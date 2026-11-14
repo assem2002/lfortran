@@ -11,7 +11,7 @@
 # people's PRs) can pick the same intrinsics_NNN. Same-named modules inside two
 # tests (e.g. operator_overloading_41_mod) can also clash once both are merged.
 
-MAIN=${BATCH_FIX_MAIN:-$HOME/lfortran_test/lfortran}
+. "$(dirname "$(readlink -f "$0")")/_lib.sh"
 cd "$MAIN" || exit 2
 names=(); self=""
 if [ "${1:-}" = "--branch" ]; then

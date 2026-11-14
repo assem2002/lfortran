@@ -5,7 +5,7 @@
 # Usage: slot_status.sh [history-lines]      (default 12; 0 hides the history)
 # Watch it live from another terminal with: watch -n 5 <this script>
 
-STATE=${BATCH_FIX_STATE:-$HOME/lfortran_test/.batch-fix}
+. "$(dirname "$(readlink -f "$0")")/_lib.sh"
 LOCK=$STATE/build.lock
 QUEUE=$STATE/queue
 CURRENT=$STATE/slot_current

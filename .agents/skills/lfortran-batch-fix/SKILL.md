@@ -49,7 +49,7 @@ The one build on `/` is the main build in `~/lfortran_test/lfortran` (the user's
 | `~/lfortran_test/.batch-fix/` | Batch state: `base_sha`, `build.lock`, the `build_slot.open` marker, the queue (`queue/`, `slot_current`, `slot_history.log`), baseline logs, `registry.md`, `followups.md`, `done/<N>/`. |
 | `~/lfortran_test/Claude_creates_lists_for_me/lfortran-fixable-issues.md` | Candidate list. Reproducers from scouting are in `~/lfortran_test/lfortran-fixable-issues/<N>/`. |
 
-Scripts are in this skill's `scripts/` folder (`<skill>/scripts/...` below).
+Scripts are in this skill's `scripts/` folder (`<skill>/scripts/...` below). The machine's paths (state directory, nvme partition, main checkout, fork remote, conda env, job counts) are set in one place, `scripts/_lib.sh`; each can be changed with the `BATCH_FIX_*` variable named there.
 
 ## The build slot and its queue
 

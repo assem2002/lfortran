@@ -11,10 +11,11 @@ that caused it is reverted. This skill is that loop on this machine.
 
 Builds go through the build slot of the `lfortran-batch-fix` skill (`slot.sh`).
 Never build LFortran any other way here; the user's words: "Use the build slot
-if you're building lfortran". The rules of the `building_lfortran` skill hold:
+if you're building lfortran". The rules of the `building-lfortran` skill hold:
 everything on `/media/assem/nvme-9gb`, 8 threads.
 
 Scripts are in this skill's `scripts/` folder (`<skill>/scripts/...` below).
+`<skills>` is the folder that holds this skill and `lfortran-batch-fix`.
 
 ## 1. Read the failing job
 
@@ -85,9 +86,9 @@ reverting the merge now so `main` is green again. The user decides.
 Use the `lfortran-batch-fix` machinery for one job, done by you (no subagent):
 
 ```bash
-~/.claude/skills/lfortran-batch-fix/scripts/prepare_build_worktree.sh     # slot and base to the latest main
-~/.claude/skills/lfortran-batch-fix/scripts/baseline.sh                   # background, about 10 min
-~/.claude/skills/lfortran-batch-fix/scripts/setup_issue.py <N> --slug <words>
+<skills>/lfortran-batch-fix/scripts/prepare_build_worktree.sh     # slot and base to the latest main
+<skills>/lfortran-batch-fix/scripts/baseline.sh                   # background, about 10 min
+<skills>/lfortran-batch-fix/scripts/setup_issue.py <N> --slug <words>
 ```
 
 Use the number of the issue it fixes; with none, ask the user what to use.
@@ -120,7 +121,7 @@ Then follow `machine.md` in the new state directory, with these points:
 - `publish_pr.sh <N> --title "fix: ..."`. If it pushes but `gh pr create` fails
   with "error opening '/media/.../.git': Permission denied" (`gh` is a snap),
   open the PR from the home checkout:
-  `cd ~/lfortran_test/lfortran && gh pr create --repo lfortran/lfortran --draft --base main --head assem2002:<branch> --title "..." --body-file - < <body copied to ~/lfortran_test/...>`.
+  `cd ~/lfortran_test/lfortran && gh pr create --repo lfortran/lfortran --draft --base main --head <your GitHub login>:<branch> --title "..." --body-file - < <body copied to ~/lfortran_test/...>`.
 - The PR body uses the user's form (`Fixes #N`, The issue, Why it happened,
   The fix, Tests). Right after `Fixes`, one line links the CI run and names the
   PR that caused it. A fix to an ASR pass shows, in The fix, that pass's

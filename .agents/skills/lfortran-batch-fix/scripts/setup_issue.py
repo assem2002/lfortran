@@ -7,7 +7,7 @@ Usage:
 This is fix-issue's Phase 1 without the per-job build, which this machine has
 no room for:
 - branch fix/ISSUE-SLUG at the batch's pinned base ($STATE/base_sha, written by
-  prepare_build_worktree.sh) in the worktree /media/assem/nvme-9gb/lfortran-src-ISSUE;
+  prepare_build_worktree.sh) in the worktree $WORK/lfortran-src-ISSUE;
 - <worktree>/.fix-issue/ISSUE/machine.md, from assets/machine.md, which the
   issue's agent reads first, and a starting state.md.
 Prints the paths.
@@ -18,18 +18,17 @@ import re
 import subprocess
 import sys
 
-home = os.path.expanduser("~")
-STATE = os.environ.get("BATCH_FIX_STATE", f"{home}/lfortran_test/.batch-fix")
-# The build slot and the source worktrees live on the nvme-9gb partition (the user's choice, 2026-10-20).
-WORK = os.environ.get("BATCH_FIX_WORK", "/media/assem/nvme-9gb")
-BUILD = os.environ.get("BATCH_FIX_BUILD", f"{WORK}/lfortran-fixes")
-MAIN = os.environ.get("BATCH_FIX_MAIN", f"{home}/lfortran_test/lfortran")
-ISSUES_DIR = f"{home}/lfortran_test/lfortran-fixable-issues"
-SKILL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SKILL = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
 def run(*cmd):
     return subprocess.run(cmd, check=True, capture_output=True, text=True).stdout.strip()
+
+
+# The machine's paths are set in _lib.sh only.
+STATE, WORK, BUILD, MAIN, FORK, ISSUES_DIR, SKILLS = run(
+    "bash", "-c", f'. "{SKILL}/scripts/_lib.sh" && '
+    'printf "%s\\n" "$STATE" "$WORK" "$BUILD" "$MAIN" "$FORK" "$ISSUES_DIR" "$SKILLS"').split("\n")
 
 
 ap = argparse.ArgumentParser()
@@ -55,6 +54,8 @@ os.makedirs(state)
 
 title = run("gh", "issue", "view", a.issue, "-R", "lfortran/lfortran", "--json", "title", "--jq", ".title")
 ident = run("git", "-C", src, "var", "GIT_AUTHOR_IDENT").rsplit(" ", 2)[0]
+fork_url = run("git", "-C", MAIN, "remote", "get-url", FORK)
+fork_repo = re.sub(r"^.*github\.com[:/]|\.git$", "", fork_url)
 repro = a.repro
 if repro is None and os.path.isdir(f"{ISSUES_DIR}/{a.issue}"):
     repro = f"{ISSUES_DIR}/{a.issue}/re0.f90"
@@ -64,7 +65,8 @@ repro = (f"A copy of the issue's code from earlier scouting is at `{repro}`; `re
 subst = {
     "__ISSUE__": a.issue, "__TITLE__": title, "__BASE__": base[:10], "__SRC__": src,
     "__BRANCH__": branch, "__BUILD__": BUILD, "__MAIN__": MAIN, "__STATE__": STATE,
-    "__SCRIPTS__": f"{SKILL}/scripts", "__IDENT__": ident, "__REPRO__": repro,
+    "__SCRIPTS__": f"{SKILL}/scripts", "__SKILLS__": SKILLS, "__FORK__": FORK,
+    "__FORK_REPO__": fork_repo, "__IDENT__": ident, "__REPRO__": repro,
 }
 t = open(f"{SKILL}/assets/machine.md").read()
 for k, v in subst.items():
@@ -72,7 +74,7 @@ for k, v in subst.items():
 open(f"{state}/machine.md", "w").write(t)
 open(f"{state}/state.md", "w").write(
     f"# Issue #{a.issue}: {title}\n\n"
-    f"- worktree: {src}\n- branch: {branch}\n- base: {base}\n- fork remote: myrepo\n"
+    f"- worktree: {src}\n- branch: {branch}\n- base: {base}\n- fork remote: {FORK}\n"
     f"- compiler: the shared build slot, through {SKILL}/scripts/slot.sh\n"
     f"- pr:\n- round: 0\n- last_pushed_sha:\n- suites_green_sha:\n- status: set up, nothing started\n")
 print(f"worktree {src} on {branch} at {base[:10]}")
