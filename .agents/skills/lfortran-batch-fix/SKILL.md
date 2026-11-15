@@ -100,7 +100,9 @@ For each fixer that reports `READY FOR REVIEW <sha>`:
    - `CLEAN` (only `follow-up` and `nit` items, or none): the reviewer has written `review_clean_sha` in `state.md`. Check it equals the branch HEAD, then resume the fixer with prompt 1P to publish. `publish_pr.sh` refuses without a clean review, or when the branch changed after it.
 3. When the fixer disagrees with a finding, it writes why in `round_<k>.md`; the next reviewer judges it. If two rounds disagree on the same point, ask the user.
 4. After three rounds that are not clean, stop and tell the user what is still open; do not publish.
-5. Reviewers list unrelated bugs at the end of their reports. Take them into the side-bug ledger like a fixer's (see "Side bugs").
+5. Fixers and reviewers sort every other bug they meet (it fails on `main` too) into two lists, each bug with a one-line reason (the user's rule, 2026-11-15):
+   - **Fix in this PR**: it makes sense as part of this fix, and a standalone issue and PR would add overhead for no reason. A reviewer's are `rework` findings and go to the fixer with prompt 1F; the fixer fixes them in their own commits with a `## Why <other bug> is fixed here too` section. If one looks too large for the PR, ask the user.
+   - **Report separately**: not really related to the fix, or better fixed in a standalone fix. Take them into the side-bug ledger (see "Side bugs").
 
 Run review rounds of different issues at the same time, like the fixers; the reviewers queue for the build slot with everyone else.
 
@@ -120,7 +122,7 @@ The user asked on 2026-10-21: "any issue that actually works in main should be l
 ### Side bugs: always filed upstream
 Every LFortran bug an agent meets that its own issue does not need ends up as an upstream issue: a failure that also happens on `main`, something seen while reducing, reviewing or reading CI logs. This is `fix-issue`'s follow-up procedure, and the user asked on 2026-10-12 that it never be skipped. Start on it as soon as an agent's report arrives; do not leave it for the end of the batch.
 
-1. Fixers list such bugs at the end of every report and in their `followups.md`, and reviewers at the end of theirs, each with a standalone reproducer saved in the state directory.
+1. Fixers (in their reports and `followups.md`) and reviewers (in their reports) list such bugs under **Report separately**, each with its reason and a standalone reproducer saved in the state directory. Bugs listed under **Fix in this PR** are fixed on the branch instead (see "2b"); if one was already reported upstream, its PR line is `Fixes #M`.
 2. Copy each into the batch ledger `~/lfortran_test/.batch-fix/followups.md` as `unfiled`, merging a bug that two jobs reported.
 3. Take the `unfiled` entries one at a time:
    - Confirm it on the pinned base, with the gfortran result alongside: run `~/lfortran_test/lfortran/src/bin/lfortran` directly (its HEAD is the `base_sha`; if not, `cd /media/assem/nvme-9gb/lfortran-src-base && <skill>/scripts/slot.sh bash -c '...'`). If it passes on the base, the branch caused it: mark it `regression` and send it back to that issue's agent.
@@ -138,7 +140,7 @@ File even when the job that found the bug is blocked or produced no PR. Only bug
 ### 5. Finish
 - Check the ledger: no side bug may still be `unfiled`.
 - Remove the issues from the candidate list.
-- Report one table covering every selected issue exactly once: issue, PR (draft), branch, what the fix was, the review rounds (what each found and what changed) and any follow-up items the reviews left open. Add the issues filed and the duplicates linked.
+- Report one table covering every selected issue exactly once: issue, PR (draft), branch, what the fix was, the review rounds (what each found and what changed) and any follow-up items the reviews left open. Then, per PR, the other bugs in two lists, each bug with its reason: **Fixed in this PR** (it makes sense as part of this fix; a standalone issue and PR would add overhead for no reason) and **Reported separately** (not really related to the fix, or better fixed in a standalone fix), with the issues filed and the duplicates linked.
 - Close the slot: `rm ~/lfortran_test/.batch-fix/build_slot.open`.
 - Free the disk: `<skill>/scripts/cleanup_issue.sh <N>` for each issue whose PR is open. It keeps the branch and the fork and saves the state directory to `.batch-fix/done/<N>/`. To work on a PR again later, add a worktree for its branch (`git -C ~/lfortran_test/lfortran worktree add /media/assem/nvme-9gb/lfortran-src-<N> <branch>`) and copy the saved state back.
 

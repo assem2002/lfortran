@@ -26,6 +26,15 @@ The user asked for this on 2026-11-15, after a batch where every fix had passed 
 - Do not push, open PRs, comment, label or file issues.
 - Never run the suites (the fixer does after each change); single programs only. Batch your slot calls into one `slot.sh bash -c '...'` or script, run long ones in the background, and keep reading while you wait: the slot is shared.
 
+## Other bugs you meet: this PR, or a separate issue
+A bug that passes on `main` and fails on the branch is a regression: it is a finding (blocker or rework), not an "other bug".
+
+Every other LFortran bug you meet fails on `main` too. Put each one in exactly one of two lists, with a one-line reason (the user's rule, 2026-11-15):
+- **Fix in this PR.** We think it should be fixed in the same PR: it makes sense as part of this fix, and opening a standalone issue and PR for it adds overhead for no reason. Typical cases: it is on the same code path as the fix, or in a copy of the changed code; the fix makes it reachable or worse (for example, code that was a compile error on `main` now runs into it and gives a wrong result); it needs a small change next to the fix that the same kind of test covers; without it, the feature the PR adds is still broken in an obvious nearby case. In `review_<k>.md` class it `rework`, so the round is not clean until the fixer fixes it or explains why not.
+- **Report separately.** It is not really related to the fix, or it is better fixed in a standalone fix: another root cause or another part of the compiler, a change that needs its own design or would make this PR much larger or harder to review. The coordinator files it as its own issue.
+
+When you are not sure, put it under "Report separately" and say why you were unsure. For each bug in either list, save a standalone reproducer in `review_<k>/` and give the command, the `main` output and the gfortran output.
+
 ## The verdict
 - If the round has no blocker and no rework item, add the line `- review_clean_sha: <the branch's HEAD sha>` to `<src>/.fix-issue/<N>/state.md`. `publish_pr.sh` needs it, and refuses if the branch changes after it.
 - Otherwise do not write that line.
@@ -34,4 +43,6 @@ The user asked for this on 2026-11-15, after a batch where every fix had passed 
 - Verdict: `CLEAN` or `NEEDS WORK`, and the HEAD sha you reviewed.
 - Findings, one line each with its class and the program path.
 - In round 2 or later: each earlier finding, fixed or not.
-- Unrelated bugs: LFortran bugs that the branch does not cause and does not need (they fail on `main` too), each with a standalone reproducer in `review_<k>/`, the command, the `main` output and the gfortran output. The coordinator files them. A bug that passes on `main` and fails on the branch is not unrelated: it is a finding.
+- Other bugs, in the two lists of "Other bugs you meet" (or `none`):
+  - **Fix in this PR**: each bug with its reason, its reproducer and the three outputs. These are also `rework` findings above.
+  - **Report separately**: each bug with its reason (not really related to the fix, or better fixed on its own), its reproducer, the command, the `main` output and the gfortran output.

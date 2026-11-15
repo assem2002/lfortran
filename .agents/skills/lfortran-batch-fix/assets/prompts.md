@@ -18,7 +18,7 @@ One fixer agent per issue, and its job ends when the draft PR is open. Start it 
 > Authorized: commits on your branch with no co-author or AI-attribution lines, pushes to `myrepo`, and the draft PR against `lfortran/lfortran`. Not authorized: pushing to `origin`, filing issues, commenting anywhere, labels, marking ready.
 > [Other issues being fixed now: #A, #B. If yours shares a root cause with one of them, or needs its fix, stop before publishing and say so.]
 >
-> Report as machine.md describes: `READY FOR REVIEW <sha>` (or why you stopped), the commit SHAs, the suite results against the baseline, anything left open, and the Unrelated bugs list.
+> Report as machine.md describes: `READY FOR REVIEW <sha>` (or why you stopped), the commit SHAs, the suite results against the baseline, anything left open, and the other bugs in two lists, "Fix in this PR" and "Report separately", each with its reason.
 
 ## 1R. Start a fresh reviewer for round k (a NEW agent every round)
 
@@ -34,7 +34,7 @@ Send when the fixer reports `READY FOR REVIEW`. Start a new background `general-
 
 Send to the SAME fixer agent when a reviewer reports `NEEDS WORK`. Pass the file, not your summary of it.
 
-> Review round <k> of your branch found work to do: `.fix-issue/<N>/review_<k>.md`. Read it in full. Fix every `blocker` and `rework` item as machine.md says (step 4 of "One fixer agent, a fresh reviewer before publishing"): new commits only, a fix commit then a `test:` commit, never amend or rebase what the reviewer saw; for a finding you disagree with, write why in `round_<k>.md` with a program that shows it. Rerun the targeted checks, rerun the suites if `src/` or `grammar/` changed, and update `pr_body.md` if it is no longer true. Do not publish. Then report `READY FOR REVIEW <sha>` with, for each finding, what you changed or why not.
+> Review round <k> of your branch found work to do: `.fix-issue/<N>/review_<k>.md`. Read it in full. Fix every `blocker` and `rework` item, including each bug the reviewer put under "Fix in this PR", as machine.md says (step 4 of "One fixer agent, a fresh reviewer before publishing"): new commits only, a fix commit then a `test:` commit, never amend or rebase what the reviewer saw; for a finding you disagree with, write why in `round_<k>.md` with a program that shows it. Rerun the targeted checks, rerun the suites if `src/` or `grammar/` changed, and update `pr_body.md` if it is no longer true. Do not publish. Then report `READY FOR REVIEW <sha>` with, for each finding, what you changed or why not.
 
 ## 1P. Publish after a clean round
 
