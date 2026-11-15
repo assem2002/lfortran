@@ -4,7 +4,9 @@
 #
 # Refuses unless: the worktree is clean, the repository's AI-authorship check
 # passes, the local suites are current for src/ and grammar/ (the push
-# invariant: `- suites_green_sha: <sha>` in state.md), and the new test names
+# invariant: `- suites_green_sha: <sha>` in state.md), the first publish has a
+# clean fresh-agent review of the current branch (`- review_clean_sha: <sha>`
+# in state.md, written by the reviewer; SKILL.md "2b"), and the new test names
 # are free. Then it pushes the branch to the fork (`myrepo`, never `origin`)
 # and, unless the PR already exists or --push-only is given, opens a draft PR
 # against lfortran/lfortran from .fix-issue/<N>/pr_body.md. The title defaults
@@ -31,6 +33,12 @@ green=$(sed -n 's/^- suites_green_sha: *//p' "$st/state.md" 2>/dev/null | head -
 [ -n "$green" ] || { echo "state.md has no suites_green_sha; run the suites first" >&2; exit 1; }
 git -C "$src" diff --quiet "$green" HEAD -- src grammar \
     || { echo "src/ or grammar/ changed since the suites passed at ${green:0:10}; rerun them first" >&2; exit 1; }
+if [ $push_only = no ]; then
+    clean=$(sed -n 's/^- review_clean_sha: *//p' "$st/state.md" 2>/dev/null | head -1)
+    [ -n "$clean" ] || { echo "state.md has no review_clean_sha; a fresh reviewer must pass the branch first (SKILL.md, 2b)" >&2; exit 1; }
+    git -C "$src" diff --quiet "$clean" HEAD \
+        || { echo "the branch changed after the clean review at ${clean:0:10}; it needs another review round" >&2; exit 1; }
+fi
 "$here/check_test_names.sh" --branch "$b" || { echo "a test name is taken; rename the test and its modules" >&2; exit 1; }
 
 # --force-with-lease: a rebased branch must replace the old one on the fork.

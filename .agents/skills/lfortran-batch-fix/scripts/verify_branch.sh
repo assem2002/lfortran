@@ -32,5 +32,13 @@ elif git diff --quiet "$green" "$b" -- src grammar; then
 else
     echo "--- push invariant: NOT current; src/ or grammar/ changed since ${green:0:10}, rerun the suites"
 fi
+clean=$(sed -n 's/^- review_clean_sha: *//p' "$src/.fix-issue/$i/state.md" 2>/dev/null | head -1)
+if [ -z "$clean" ]; then
+    echo "--- review: no clean fresh-agent review recorded (review_clean_sha)"
+elif git diff --quiet "$clean" "$b"; then
+    echo "--- review: clean at ${clean:0:10}, branch unchanged since"
+else
+    echo "--- review: NOT current; the branch changed after the clean review at ${clean:0:10}"
+fi
 fork=$(git ls-remote "$FORK" "refs/heads/$b" | cut -c1-10)
 echo "--- fork: ${fork:-not pushed}  local: $(git rev-parse --short=10 "$b")"

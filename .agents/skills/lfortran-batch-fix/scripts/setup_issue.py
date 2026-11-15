@@ -76,6 +76,6 @@ open(f"{state}/state.md", "w").write(
     f"# Issue #{a.issue}: {title}\n\n"
     f"- worktree: {src}\n- branch: {branch}\n- base: {base}\n- fork remote: {FORK}\n"
     f"- compiler: the shared build slot, through {SKILL}/scripts/slot.sh\n"
-    f"- pr:\n- round: 0\n- last_pushed_sha:\n- suites_green_sha:\n- status: set up, nothing started\n")
+    f"- pr:\n- round: 0\n- last_pushed_sha:\n- suites_green_sha:\n- review_clean_sha:\n- status: set up, nothing started\n")
 print(f"worktree {src} on {branch} at {base[:10]}")
 print(f"machine rules {state}/machine.md")
