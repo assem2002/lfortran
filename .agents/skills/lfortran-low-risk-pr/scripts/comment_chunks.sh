@@ -23,15 +23,15 @@ head=$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid) || ex
 
 existing=$(gh api --paginate "repos/$repo/pulls/$pr/comments" \
     --jq "[.[] | select(.user.login == \"$me\" and .line != null
-        and (.body | startswith(\"Low risk\")))
+        and (.body | startswith(\"[[AUTOMATED -- low_risk chunk]]\")))
         | {path, line, start_line, body}]" | jq -s 'add // []') || exit 2
 
 payload=$(jq --arg head "$head" --argjson existing "$existing" '
-    def body: "Low risk (`\(.kind)`): \(.reason)";
+    def body: "[[AUTOMATED -- low_risk chunk]]\n`\(.kind)`: \(.reason)";
     [ .[] | select(. as $c | ($existing | any(
             .path == $c.path and .line == $c.line
             and (.start_line // .line) == ($c.start_line // $c.line)
-            and (.body | startswith("Low risk (`\($c.kind)`)")))) | not) ]
+            and (.body | contains("\n`\($c.kind)`:")))) | not) ]
     | if length == 0 then empty else
       { commit_id: $head, event: "COMMENT", body: "",
         comments: [ .[] | {path, line, side: (.side // "RIGHT"), body: body}
